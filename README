@@ -1,0 +1,9 @@
+This project is to build a cluster of Raspberry Pi nodes (and other
+similar hardware boards) to be managed as a kubernetes cluster.
+
+The initial configuration has two board types:
+* Raspberry Pi type B
+* Raspberry Pi 2 type B
+
+The Orange Pi Plus will be added when I get one. Plus any other hardware
+I get my hands on will be added to the franken-cluster.
