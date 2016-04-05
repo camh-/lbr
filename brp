@@ -96,7 +96,7 @@ target_oldconfig()
 target_clean()
 # ----------------------------------------------------------------------------
 {
-	rm -rf "${output_location}/${phase}"
+	rm -rf "${BRP_OUTPUT_DIR}/${phase}"
 }
 
 # ----------------------------------------------------------------------------
@@ -250,8 +250,8 @@ copy_image()
 # $2: (Optional) The name of the image after copying. If not supplied, the
 #     image keeps the same name.
 {
-	src="$output_location/${phase}/images/$1"
-	dest="$image_dir"
+	src="${BRP_OUTPUT_DIR}/${phase}/images/$1"
+	dest="${BRP_IMAGE_DIR}"
 	[ -n "$2" ] && dest="$dest/$2"
 	run cp -a "$src" "$dest"
 }
@@ -264,7 +264,7 @@ copy_images()
 # rootfs image in there is a compressed one. The rootfs image is renamed
 # to include <phase> in its name.
 {
-	srcdir="$output_location/${phase}/images"
+	srcdir="${BRP_OUTPUT_DIR}/${phase}/images"
 	for src in "${srcdir}"/* ; do
 		srcname="${src##*/}"
 		if [[ "$srcname" == rootfs.*.* ]] ; then
@@ -290,9 +290,9 @@ copy_and_pad_image()
 # $1: The name of the image to copy.
 # $2: Block size to pad image to
 {
-	src="$output_location"/"${phase}"/images/"$1"
+	src="${BRP_OUTPUT_DIR}"/"${phase}"/images/"$1"
 	if [ -f "$src" ] ; then
-		run dd if="$src" of="$image_dir"/"$1" bs="$2" conv=sync
+		run dd if="$src" of="${BRP_IMAGE_DIR}"/"$1" bs="$2" conv=sync
 	fi
 }
 
@@ -307,7 +307,7 @@ require_image()
 # $1: The name of the required image
 # $2: The name of the phase
 {
-	[ -f "$image_dir"/"$1" ] && return
+	[ -f "${BRP_IMAGE_DIR}"/"$1" ] && return
 	echo "Image $1 is required but does not exist"
 	echo "Build the phase '$2' to make that image"
 	false
@@ -420,16 +420,20 @@ set_vars()
 	phase="$2"
 	target="${3:-build}"
 
+	# $output_root can be defined in brp.conf
+	# TODO(camh): Check whether default relative path "output" works
+	BRP_OUTPUT_DIR="${output_root:-output}/${board}"
+	BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
+
 	defconfig="${board}_${phase}_defconfig"
 	srcconfig="configs/${defconfig}"
-	output_location="${output_root:-output}/${board}"
-	log_dir="${output_location}"/logs
-	image_dir="${output_location}"/images
+
+	log_dir="${BRP_OUTPUT_DIR}"/logs
 	tmp_dir=""
 
 	make_args=(
 		-C "${buildroot}"
-		"O=${output_location}/${phase}"
+		"O=${BRP_OUTPUT_DIR}/${phase}"
 		"BR2_EXTERNAL=$(pwd)"
 	)
 
@@ -437,15 +441,17 @@ set_vars()
 
 	force=0
 	dryrun=0
+
+	export BRP_OUTPUT_DIR BRP_IMAGE_DIR
 }
 
 # ----------------------------------------------------------------------------
 make_output_dirs()
 # ----------------------------------------------------------------------------
 {
-	run mkdir -p "$output_location"
-	run mkdir -p "$log_dir"
-	run mkdir -p "$image_dir"
+	run mkdir -p "${BRP_OUTPUT_DIR}"
+	run mkdir -p "${BRP_IMAGE_DIR}"
+	run mkdir -p "${log_dir}"
 }
 
 # ----------------------------------------------------------------------------
