@@ -155,38 +155,6 @@ build_toolchain()
 	default_build
 }
 
-# ----------------------------------------------------------------------------
-build_rootfs_dev()
-# TODO: Use the BR2_ROOTFS_OVERLAY config var instead of hard-coding these
-# rootfs image names here.
-# ----------------------------------------------------------------------------
-{
-	require_image rootfs-toolchain.arm.tar.bz2 toolchain || return
-	require_image rootfs-bootloader.arm.tar.bz2 bootloader || return
-	require_image rootfs-kernel.arm.tar.bz2 kernel || return
-	require_image rootfs-basefs-dev.arm.tar.bz2 basefs_dev || return
-	default_build
-	#copy_image rootfs-dev rootfs-dev.arm.tar.bz2
-	#pad_block_size=2k
-	#copy_and_pad_image rootfs-dev rootfs-dev.arm.cpio.gz $pad_block_size
-}
-
-# ----------------------------------------------------------------------------
-build_rootfs()
-# TODO: Use the BR2_ROOTFS_OVERLAY config var instead of hard-coding these
-# rootfs image names here.
-# ----------------------------------------------------------------------------
-{
-	require_image rootfs-toolchain.arm.tar.bz2 toolchain || return
-	require_image rootfs-bootloader.arm.tar.bz2 bootloader || return
-	require_image rootfs-kernel.arm.tar.bz2 kernel || return
-	require_image rootfs-basefs.arm.tar.bz2 basefs || return
-	default_build
-	#copy_image rootfs rootfs.arm.tar.bz2
-	#pad_block_size=2k
-	#copy_and_pad_image rootfs rootfs.arm.cpio.gz $pad_block_size
-}
-
 # ============================================================================
 # CONFIG target functions
 # These functions implement the various config targets, currently
@@ -284,37 +252,6 @@ copy_images()
 			copy_image "$srcname"
 		fi
 	done
-}
-
-# ----------------------------------------------------------------------------
-copy_and_pad_image()
-# ----------------------------------------------------------------------------
-# copy_and_pad_image <image_name> <pad_block_size>
-# Copy an image from an output directory into the board saved image directory.
-# $1: The name of the image to copy.
-# $2: Block size to pad image to
-{
-	src="${BRP_OUTPUT_DIR}"/"${phase}"/images/"$1"
-	if [ -f "$src" ] ; then
-		run dd if="$src" of="${BRP_IMAGE_DIR}"/"$1" bs="$2" conv=sync
-	fi
-}
-
-# ----------------------------------------------------------------------------
-require_image()
-# ----------------------------------------------------------------------------
-# require_image <image_name> <phase>
-# Check that an image is in the saved image directory.
-# Returns true (0) if it is there (and is a file), false (1) if it is not.
-# If the image is not there, a message is output informing the user what
-# phase needs to be built to make the image.
-# $1: The name of the required image
-# $2: The name of the phase
-{
-	[ -f "${BRP_IMAGE_DIR}"/"$1" ] && return
-	echo "Image $1 is required but does not exist"
-	echo "Build the phase '$2' to make that image"
-	false
 }
 
 # ============================================================================
