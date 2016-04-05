@@ -67,7 +67,6 @@ main()
 target_build()
 # ----------------------------------------------------------------------------
 {
-	make_output_dirs
 	if phase_has_build_function "${phase}" ; then
 		eval build_${phase}
 	else
@@ -80,7 +79,6 @@ target_menuconfig()
 # ----------------------------------------------------------------------------
 {
 	make_output_dirs
-	create_default_config_if_missing "$1"
 	modify_buildroot_config menuconfig "$1"
 }
 
@@ -123,6 +121,7 @@ build()
 # for the phase
 # $1: The name of the phase. The output directory and log will be named this.
 {
+	make_output_dirs
 	make_target all 2>&1 | tee "${log_dir}/${phase}.log"
 	return ${PIPESTATUS[0]}
 }
@@ -143,7 +142,7 @@ build_toolchain()
 	# Give the user an option to bail out if we detect an already-
 	# installed toolchain
 	# source the toolchain buildroot config to get the install location
-	source "configs/${board}_toolchain_defconfig"
+	source "${BRP_BOARD_DIR}/config/toolchain"
 	if [ -d "${BR2_HOST_DIR}" -a $force -eq 0 ] ; then
 		echo "Toolchain already exists in ${BR2_HOST_DIR}"
 		read -p "Proceed [y/N]? " result
@@ -197,14 +196,14 @@ build_rootfs()
 create_default_config_if_missing()
 # ----------------------------------------------------------------------------
 {
-	defaultconfig="configs/${board}_toolchain_client_defconfig"
+	defaultconfig="${BRP_BOARD_DIR}/toolchain/config/toolchain_client"
 
 	# Create a default config file if one does not exist
-	if [ ! -f "${srcconfig}" ] ; then
+	if [ ! -f "${brpconfig}" ] ; then
 		if [ -f "${defaultconfig}" ] ; then
-			run cp "${defaultconfig}" "${srcconfig}"
+			run cp "${defaultconfig}" "${brpconfig}"
 		else
-			run touch "${srcconfig}"
+			run touch "${brpconfig}"
 		fi
 	fi
 }
@@ -220,8 +219,12 @@ modify_buildroot_config()
 {
 	make_target="$1"
 
-	make_target "${make_target}" \
-	&& run ${MAKE} "${make_args[@]}" savedefconfig
+	create_default_config_if_missing "$1"
+
+	cp "${brpconfig}" "${srcconfig}" \
+	&& make_target "${make_target}" \
+	&& run ${MAKE} "${make_args[@]}" savedefconfig \
+	&& cp "${srcconfig}" "${brpconfig}"
 }
 
 # ============================================================================
@@ -232,12 +235,13 @@ make_target()
 {
 	make_target="$1"
 
-	if [ ! -f "${srcconfig}" ] ; then
-		echo "No config for phase ${phase} at ${srcconfig}" >&2
+	if [ ! -f "${brpconfig}" ] ; then
+		echo "No config for phase ${phase} at ${brpconfig}" >&2
 		return 1
 	fi
 
-	run ${MAKE} "${make_args[@]}" "${defconfig}" \
+	cp "${brpconfig}" "${srcconfig}" \
+	&& run ${MAKE} "${make_args[@]}" "${defconfig}" \
 	&& run ${MAKE} "${make_args[@]}" "${make_target}"
 }
 
@@ -407,6 +411,10 @@ check_config()
 		echo "'buildroot' not set in config. Where is buildroot?" >&2
 		return 1
 	fi
+	if ! [[ -d "${BRP_BOARD_DIR}" ]] ; then
+		echo "board dir missing: ${BRP_BOARD_DIR}" >&2
+		return 1
+	fi
 	return 0
 }
 
@@ -424,9 +432,11 @@ set_vars()
 	# TODO(camh): Check whether default relative path "output" works
 	BRP_OUTPUT_DIR="${output_root:-output}/${board}"
 	BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
+	BRP_BOARD_DIR="${PWD}/board/${board}"
 
 	defconfig="${board}_${phase}_defconfig"
 	srcconfig="configs/${defconfig}"
+	brpconfig="${BRP_BOARD_DIR}/config/${phase}"
 
 	log_dir="${BRP_OUTPUT_DIR}"/logs
 	tmp_dir=""
@@ -442,7 +452,7 @@ set_vars()
 	force=0
 	dryrun=0
 
-	export BRP_OUTPUT_DIR BRP_IMAGE_DIR
+	export BRP_OUTPUT_DIR BRP_IMAGE_DIR BRP_BOARD_DIR
 }
 
 # ----------------------------------------------------------------------------
