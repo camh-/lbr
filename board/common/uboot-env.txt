@@ -1,0 +1,27 @@
+bootdelay=1
+
+bootmode=fat
+roottype=mmc
+
+kernelfile=zImage
+fdtfile=board.dtb
+
+init=/sbin/init
+console=ttyS0
+baudrate=115200
+
+base_args=setenv bootargs "earlyprintk console=${console},${baudrate} rootwait"
+init_args=setenv bootargs "${bootargs} init=${init}"
+
+tftp_init=usb start
+tftp_load_kernel=dhcp ${kernel_addr_r} ${kernelfile}; tftp ${fdt_addr_r} ${fdtfile}
+fat_init=mmc dev 0
+fat_load_kernel=fatload mmc 0:1 ${kernel_addr_r} ${kernelfile}; fatload mmc 0:1 ${fdt_addr_r} ${fdtfile}
+
+nfs_args=setenv bootargs "${bootargs} ip=dhcp root=/dev/nfs nfsroot=10.100.110.1:${nfs_root}"
+mmc_args=setenv bootargs "${bootargs} root=/dev/mmcblk0p2"
+
+bootcmd=run boot
+boot=run ${bootmode}_init; run ${bootmode}_load_kernel; run set_args; run boot_kernel
+set_args=run base_args init_args ${roottype}_args
+boot_kernel=bootz ${kernel_addr_r} - ${fdt_addr_r}
