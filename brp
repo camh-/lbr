@@ -46,7 +46,7 @@ main()
 	fi
 	
 	if known_target "${target}" ; then
-		eval target_${target} ${phase}
+		eval "target_${target}" "${phase}"
 	else
 		target_unknown "${target}" "${phase}"
 	fi
@@ -66,7 +66,7 @@ target_build()
 # ----------------------------------------------------------------------------
 {
 	if phase_has_build_function "${phase}" ; then
-		eval build_${phase}
+		eval "build_${phase}"
 	else
 		default_build
 	fi
@@ -92,14 +92,16 @@ target_oldconfig()
 target_clean()
 # ----------------------------------------------------------------------------
 {
-	rm -rf "${BRP_OUTPUT_DIR}/${phase}"
+	if [[ -n "${BRP_OUTPUT_DIR}" ]] && [[ -n "${phase}" ]]; then
+		rm -rf "${BRP_OUTPUT_DIR}/${phase}"
+	fi
 }
 
 # ----------------------------------------------------------------------------
 target_unknown()
 # ----------------------------------------------------------------------------
 {
-	make_target "$1" "$2"
+	make_target "$1"
 }
 
 # ============================================================================
@@ -121,7 +123,7 @@ build()
 {
 	make_output_dirs
 	make_target all 2>&1 | tee "${log_dir}/${phase}.log"
-	return ${PIPESTATUS[0]}
+	return "${PIPESTATUS[0]}"
 }
 
 # ----------------------------------------------------------------------------
@@ -140,11 +142,11 @@ build_toolchain()
 	# Give the user an option to bail out if we detect an already-
 	# installed toolchain
 	# source the toolchain buildroot config to get the install location
-	eval $(grep -w ^BR2_HOST_DIR "${BRP_BOARD_DIR}/config/toolchain")
-	if [ -d "${BR2_HOST_DIR}" -a $force -eq 0 ] ; then
+	eval "$(grep -w ^BR2_HOST_DIR "${BRP_BOARD_DIR}/config/toolchain")"
+	if [ -d "${BR2_HOST_DIR}" -a "${force}" -eq 0 ] ; then
 		echo "Toolchain already exists in ${BR2_HOST_DIR}"
 		read -p "Proceed [y/N]? " result
-		if [ "$result" != y -a "$result" != Y ] ; then
+		if [ "${result}" != y -a "${result}" != Y ] ; then
 			echo "Aborting"
 			exit 0
 		fi
@@ -186,9 +188,9 @@ create_default_config_if_missing()
 	defaultconfig="${BRP_BOARD_DIR}/toolchain/config/toolchain_client"
 
 	# Create a default config file if one does not exist
-	if [ ! -f "${brpconfig}" ] ; then
-		mkdir -p ${brpconfig%/*}
-		if [ -f "${defaultconfig}" ] ; then
+	if [[ ! -f "${brpconfig}" ]] ; then
+		mkdir -p "${brpconfig%/*}"
+		if [[ -f "${defaultconfig}" ]] ; then
 			run cp "${defaultconfig}" "${brpconfig}"
 		else
 			run touch "${brpconfig}"
@@ -209,8 +211,7 @@ modify_buildroot_config()
 
 	create_default_config_if_missing "$1"
 
-	cp "${brpconfig}" "${srcconfig}" \
-	&& make_target "${make_target}" \
+	make_target "${make_target}" \
 	&& run ${MAKE} "${make_args[@]}" savedefconfig \
 	&& cp "${srcconfig}" "${brpconfig}"
 }
@@ -244,7 +245,7 @@ copy_image()
 {
 	src="${BRP_OUTPUT_DIR}/${phase}/images/$1"
 	dest="${BRP_IMAGE_DIR}"
-	[ -n "$2" ] && dest="$dest/$2"
+	[[ -n "$2" ]] && dest="$dest/$2"
 	run cp -a "$src" "$dest"
 }
 
@@ -279,14 +280,14 @@ copy_images()
 phase_has_build_function()
 # ----------------------------------------------------------------------------
 {
-	[ "$(type -t build_${1})" = function ]
+	[[ "$(type -t "build_${1}")" = function ]]
 }
 
 # ----------------------------------------------------------------------------
 known_target()
 # ----------------------------------------------------------------------------
 {
-	[ "$(type -t target_${1})" = function ]
+	[[ "$(type -t "target_${1}")" = function ]]
 }
 
 # ----------------------------------------------------------------------------
@@ -294,7 +295,7 @@ run()
 # ----------------------------------------------------------------------------
 {
 	echo "$@"
-	[ $dryrun -ne 0 ] || "$@"
+	[[ "${dryrun}" -ne 0 ]] || "$@"
 }
 
 # ----------------------------------------------------------------------------
@@ -306,7 +307,7 @@ start_tmp()
 # The caller should call end_tmp() when they no longer need the temp dir
 # Returns true if we could create the tmp_dir, false if not.
 {
-	[ -z "$tmp_dir" ] || return 1
+	[[ -z "${tmp_dir}" ]] || return 1
 	trap clean_tmp EXIT
 	tmp_dir=$(mktemp -d)
 }
@@ -325,8 +326,8 @@ clean_tmp()
 # ----------------------------------------------------------------------------
 # Remove the directory in $tmp_dir if that variable is set.
 {
-	[ -n "$tmp_dir" ] || return 1
-	rm -rf "$tmp_dir"
+	[[ -n "${tmp_dir}" ]] || return 1
+	rm -rf "${tmp_dir}"
 	tmp_dir=""
 	trap - EXIT
 }
@@ -345,6 +346,7 @@ sep()
 # ----------------------------------------------------------------------------
 # Output arguments seperated by $1
 {
+	# shellcheck disable=SC2030
 	(IFS="$1"; shift; echo "$*")
 }
 
@@ -353,7 +355,7 @@ prepend_path()
 # ----------------------------------------------------------------------------
 # Prepend arguments to $PATH
 {
-	PATH=$(sep : "$@" "$PATH")
+	PATH=$(sep : "$@" "${PATH}")
 }
 
 # ----------------------------------------------------------------------------
@@ -365,7 +367,7 @@ add_host_path()
 # (probably to have it in the toolchain "board" as the host tools do not
 # need to be defined or built for every board).
 {
-	prepend_path ${BRP_OUTPUT_DIR}/host/host/{,usr/}{bin,sbin}
+	prepend_path "${BRP_OUTPUT_DIR}"/host/host/{,usr/}{bin,sbin}
 }
 
 # ============================================================================
@@ -426,6 +428,7 @@ load_config()
 # ----------------------------------------------------------------------------
 {
 	local found=false
+	# shellcheck disable=SC2031
 	oldifs="$IFS"
 	IFS=:
 	local -a xdg=(${XDG_CONFIG_DIRS:-/etc/xdg})
@@ -435,14 +438,14 @@ load_config()
 		"${XDG_CONFIG_HOME:-$HOME/.config}/brp"
 		"${project}/brp.conf")
 	for path in "${search[@]}" ; do
-		if [ -f "$path" ] ; then
+		if [[ -f "$path" ]] ; then
 			source "$path"
 			found=true
 		fi
 	done
 
 	if ! "${found}"; then
-		echo "No config file found. Searched: ${search[@]}" >&2
+		echo "No config file found. Searched: " "${search[@]}" >&2
 		return 1
 	fi
 
