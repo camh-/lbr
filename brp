@@ -19,10 +19,10 @@ usage()
 # ----------------------------------------------------------------------------
 {
 	cat <<EOF
-Usage: $program_name <board> <phase> [target]
-Phases are any name with a <board>_<phase>_deconfig file in the configs/
-directory. A phase named "toolchain" is handled specially in that you will
-be prompted to overwrite it if it already exists.
+Usage: $program_name <project> <board> <phase> [target]
+Phases are any name with a <project>/board/<board>/<phase> defconfig file.
+A phase named "toolchain" is handled specially in that you will be prompted
+to overwrite it if it already exists.
 Targets are:
   build: Build the phase. This is the default.
   menuconfig: Run make menuconfig on the target, saving the minimal defconfig
@@ -39,9 +39,7 @@ main()
 # ----------------------------------------------------------------------------
 {
 	# umask 0022  # fix buildroot bug, temporary
-	load_config || exit 1
-	set_vars "$@"
-	check_config || exit 1
+	setup "$@" || exit 1
 
 	if ! known_target "${target}" ; then
 		echo "Unknown target: ${target}" >&2
@@ -142,7 +140,7 @@ build_toolchain()
 	# Give the user an option to bail out if we detect an already-
 	# installed toolchain
 	# source the toolchain buildroot config to get the install location
-	source "${BRP_BOARD_DIR}/config/toolchain"
+	eval $(grep -w ^BR2_HOST_DIR "${BRP_BOARD_DIR}/config/toolchain")
 	if [ -d "${BR2_HOST_DIR}" -a $force -eq 0 ] ; then
 		echo "Toolchain already exists in ${BR2_HOST_DIR}"
 		read -p "Proceed [y/N]? " result
@@ -153,6 +151,27 @@ build_toolchain()
 	fi
 
 	default_build
+}
+
+# ----------------------------------------------------------------------------
+build_final()
+# ----------------------------------------------------------------------------
+# A special final phase that copies the rootfs images without renaming them
+# and runs a build-image.sh script from the board directory after that, with
+# the intention that the script builds the flash/sdcard/etc images from the
+# parts built in the various phases.
+{
+	if [[ -f "${brpconfig}" ]] ; then
+		{ build && copy_images 'norename'; } || return
+	fi
+
+	if [[ -x "${BRP_BOARD_DIR}/build-image.sh" ]] ; then
+		(
+		add_host_path
+		cd "${BRP_IMAGE_DIR}"
+		"${BRP_BOARD_DIR}/build-image.sh" "${BRP_IMAGE_DIR}"
+		)
+	fi
 }
 
 # ============================================================================
@@ -168,6 +187,7 @@ create_default_config_if_missing()
 
 	# Create a default config file if one does not exist
 	if [ ! -f "${brpconfig}" ] ; then
+		mkdir -p ${brpconfig%/*}
 		if [ -f "${defaultconfig}" ] ; then
 			run cp "${defaultconfig}" "${brpconfig}"
 		else
@@ -234,23 +254,21 @@ copy_images()
 # copy_images
 # Copy all images from <phase>'s image directory, except the uncompressed
 # rootfs image in there is a compressed one. The rootfs image is renamed
-# to include <phase> in its name.
+# to include <phase> in its name, unless "$1" == 'norename'.
 {
 	srcdir="${BRP_OUTPUT_DIR}/${phase}/images"
 	for src in "${srcdir}"/* ; do
+		[[ "$src" = "${srcdir}/*" ]] && continue
 		srcname="${src##*/}"
-		if [[ "$srcname" == rootfs.*.* ]] ; then
+		if [[ "$1" != 'norename' ]] ; then
 			newname="${srcname/rootfs/rootfs-${phase}}"
-			copy_image "$srcname" "$newname"
-		elif [[ "$srcname" == rootfs.* ]] ; then
-			# If there's no rootfs.*.* file, copy this one
-			if [ ! -f "$src".* ] ; then
-				newname="${srcname/rootfs/rootfs-${phase}}"
-				copy_image "$srcname" "$newname"
-			fi
-		else
-			copy_image "$srcname"
 		fi
+		# Don't copy uncompressed rootfs if there's a compressed one.
+		if [[ "$srcname" =~ ^rootfs\.[^\.]*$ ]] && globmatch "${src}.*"
+		then
+			continue
+		fi
+		copy_image "$srcname" "${newname-}"
 	done
 }
 
@@ -313,15 +331,101 @@ clean_tmp()
 	trap - EXIT
 }
 
+# ----------------------------------------------------------------------------
+globmatch()
+# ----------------------------------------------------------------------------
+# $1: A glob pattern
+# Returns true if $1 matches any files, false if not
+{
+	compgen -G "$1" > /dev/null
+}
+
+# ----------------------------------------------------------------------------
+sep()
+# ----------------------------------------------------------------------------
+# Output arguments seperated by $1
+{
+	(IFS="$1"; shift; echo "$*")
+}
+
+# ----------------------------------------------------------------------------
+prepend_path()
+# ----------------------------------------------------------------------------
+# Prepend arguments to $PATH
+{
+	PATH=$(sep : "$@" "$PATH")
+}
+
+# ----------------------------------------------------------------------------
+add_host_path()
+# ----------------------------------------------------------------------------
+# Add the host tools to PATH. This is the "host" directory of a build phase.
+# Currently that is hardcoded as the "host" phase and must be a phase of
+# the current board. This will probably change in future to be more flexible
+# (probably to have it in the toolchain "board" as the host tools do not
+# need to be defined or built for every board).
+{
+	prepend_path ${BRP_OUTPUT_DIR}/host/host/{,usr/}{bin,sbin}
+}
+
 # ============================================================================
 # SETUP
 # Functions to read the config and set up the environment that the rest of
 # this script depends on
 
 # ----------------------------------------------------------------------------
+setup()
+# ----------------------------------------------------------------------------
+{
+	program_name=${0##*/}
+
+	project="$1"
+	board="$2"
+	phase="$3"
+	target="${4:-build}"
+
+	[[ -n "${project}" ]] || usage 1 >&2
+	[[ -n "${board}" ]] || usage 1 >&2
+	[[ -n "${phase}" ]] || usage 1 >&2
+
+	load_config || return 1
+
+	# $output_root can be defined in brp.conf
+	BRP_PROJECT_DIR="${PWD}/${project}"
+	BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
+	BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
+	BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
+	BRP_BOARD_DIR="${BRP_PROJECT_DIR}/board/${board}"
+
+	check_config || return 1
+
+	defconfig="${board}_${phase}_defconfig"
+	srcconfig="${BRP_PROJECT_DIR}/configs/${defconfig}"
+	brpconfig="${BRP_BOARD_DIR}/config/${phase}"
+
+	log_dir="${BRP_OUTPUT_DIR}"/logs
+	tmp_dir=""
+
+	make_args=(
+		-C "${buildroot}"
+		"O=${BRP_OUTPUT_DIR}/${phase}"
+		"BR2_EXTERNAL=${PWD}/core:${BRP_PROJECT_DIR}"
+	)
+
+	[[ "$V" == '1' ]] && make_args+=("V=1")
+
+	force=0
+	dryrun=0
+
+	export BRP_PROJECT_DIR BRP_OUTPUT_ROOT BRP_OUTPUT_DIR BRP_IMAGE_DIR \
+		BRP_BOARD_DIR
+}
+
+# ----------------------------------------------------------------------------
 load_config()
 # ----------------------------------------------------------------------------
 {
+	local found=false
 	oldifs="$IFS"
 	IFS=:
 	local -a xdg=(${XDG_CONFIG_DIRS:-/etc/xdg})
@@ -329,12 +433,19 @@ load_config()
 	local -a search=(
 		"${xdg[@]/%//brp}"
 		"${XDG_CONFIG_HOME:-$HOME/.config}/brp"
-		./brp.conf)
+		"${project}/brp.conf")
 	for path in "${search[@]}" ; do
 		if [ -f "$path" ] ; then
 			source "$path"
+			found=true
 		fi
 	done
+
+	if ! "${found}"; then
+		echo "No config file found. Searched: ${search[@]}" >&2
+		return 1
+	fi
+
 	return 0
 }
 
@@ -342,8 +453,6 @@ load_config()
 check_config()
 # ----------------------------------------------------------------------------
 {
-	[[ -n "${board}" ]] || usage 1 >&2
-	[[ -n "${phase}" ]] || usage 1 >&2
 	if [[ -z "${buildroot}" ]] ; then
 		echo "'buildroot' not set in config. Where is buildroot?" >&2
 		return 1
@@ -353,43 +462,6 @@ check_config()
 		return 1
 	fi
 	return 0
-}
-
-# ----------------------------------------------------------------------------
-set_vars()
-# ----------------------------------------------------------------------------
-{
-	program_name=${0##*/}
-
-	board="$1"
-	phase="$2"
-	target="${3:-build}"
-
-	# $output_root can be defined in brp.conf
-	# TODO(camh): Check whether default relative path "output" works
-	BRP_OUTPUT_DIR="${output_root:-output}/${board}"
-	BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
-	BRP_BOARD_DIR="${PWD}/board/${board}"
-
-	defconfig="${board}_${phase}_defconfig"
-	srcconfig="configs/${defconfig}"
-	brpconfig="${BRP_BOARD_DIR}/config/${phase}"
-
-	log_dir="${BRP_OUTPUT_DIR}"/logs
-	tmp_dir=""
-
-	make_args=(
-		-C "${buildroot}"
-		"O=${BRP_OUTPUT_DIR}/${phase}"
-		"BR2_EXTERNAL=$(pwd)"
-	)
-
-	[[ "$V" == '1' ]] && make_args+=("V=1")
-
-	force=0
-	dryrun=0
-
-	export BRP_OUTPUT_DIR BRP_IMAGE_DIR BRP_BOARD_DIR
 }
 
 # ----------------------------------------------------------------------------
