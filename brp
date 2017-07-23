@@ -31,7 +31,7 @@ Targets are:
     back in the configs directory.
   clean: Remove the output directory for the phase.
 EOF
-	[ -z "${1}" ] || exit "${1}"
+	[[ -z "$1" ]] || exit "$1"
 }
 
 # ----------------------------------------------------------------------------
@@ -93,6 +93,7 @@ target_clean()
 # ----------------------------------------------------------------------------
 {
 	if [[ -n "${BRP_OUTPUT_DIR}" ]] && [[ -n "${phase}" ]]; then
+		# shellcheck disable=SC2115
 		rm -rf "${BRP_OUTPUT_DIR}/${phase}"
 	fi
 }
@@ -143,10 +144,10 @@ build_toolchain()
 	# installed toolchain
 	# source the toolchain buildroot config to get the install location
 	eval "$(grep -w ^BR2_HOST_DIR "${BRP_BOARD_DIR}/config/toolchain")"
-	if [ -d "${BR2_HOST_DIR}" -a "${force}" -eq 0 ] ; then
+	if [[ -d "${BR2_HOST_DIR}" && "${force}" -eq 0 ]] ; then
 		echo "Toolchain already exists in ${BR2_HOST_DIR}"
-		read -p "Proceed [y/N]? " result
-		if [ "${result}" != y -a "${result}" != Y ] ; then
+		read -r -p "Proceed [y/N]? " result
+		if [[ "${result}" != y && "${result}" != Y ]] ; then
 			echo "Aborting"
 			exit 0
 		fi
@@ -170,7 +171,7 @@ build_final()
 	if [[ -x "${BRP_BOARD_DIR}/build-image.sh" ]] ; then
 		(
 		add_host_path
-		cd "${BRP_IMAGE_DIR}"
+		cd "${BRP_IMAGE_DIR}" && \
 		"${BRP_BOARD_DIR}/build-image.sh" "${BRP_IMAGE_DIR}"
 		)
 	fi
@@ -224,7 +225,7 @@ make_target()
 {
 	make_target="$1"
 
-	if [ ! -f "${brpconfig}" ] ; then
+	if [[ ! -f "${brpconfig}" ]] ; then
 		echo "No config for phase ${phase} at ${brpconfig}" >&2
 		return 1
 	fi
@@ -439,6 +440,7 @@ load_config()
 		"${project}/brp.conf")
 	for path in "${search[@]}" ; do
 		if [[ -f "$path" ]] ; then
+			# shellcheck disable=SC1090
 			source "$path"
 			found=true
 		fi
