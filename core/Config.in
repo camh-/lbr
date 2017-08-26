@@ -1,0 +1,18 @@
+config BR2_BUILD_OVERLAY
+       bool "Build an overlay-only image"
+       default n
+       help
+         Build an image to use as an overlay for another build.
+
+         Buildroot supports customizing the target root filesystem
+         with overlays, which are parallel directory trees overlaid
+         over the root filesystem that buildroot builds.
+
+         If you select yes here, buildroot will build such an image
+         overlay without the skeleton parts of the image so that it
+         can be overlayed over a standard buildroot rootfs image.
+
+	 This option is only applied if the BRP_CORE post-build script
+	 is executed, by adding $(BR2_EXTERNAL_BRP_CORE_PATH)/post-build.sh
+	 to BR2_ROOTFS_POST_BUILD_SCRIPT.
+
