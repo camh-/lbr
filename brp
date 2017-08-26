@@ -393,8 +393,8 @@ setup()
 
 	load_config || return 1
 
-	# $output_root can be defined in brp.conf
-	BRP_PROJECT_DIR="${PWD}/${project}"
+	BRP_ROOT=$(find_brp_root)
+	BRP_PROJECT_DIR="${BRP_ROOT}/${project}"
 	BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
 	BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
 	BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
@@ -414,7 +414,7 @@ setup()
 	make_args=(
 		-C "${buildroot}"
 		"O=${BRP_OUTPUT_DIR}/${phase}"
-		"BR2_EXTERNAL=${PWD}/core:${BRP_PROJECT_DIR}"
+		"BR2_EXTERNAL=${BRP_ROOT}/core:${BRP_PROJECT_DIR}"
 	)
 
 	[[ "$V" == '1' ]] && make_args+=("V=1")
@@ -424,6 +424,32 @@ setup()
 
 	export BRP_PROJECT_DIR BRP_OUTPUT_ROOT BRP_OUTPUT_DIR BRP_IMAGE_DIR \
 		BRP_BOARD_DIR
+}
+
+# ----------------------------------------------------------------------------
+find_brp_root()
+# ----------------------------------------------------------------------------
+{
+	# If we are inside a brp project dir, then use its parent as the
+	# brp root. Otherwise try to find it based on the path to $0 and
+	# failing that, $PWD.
+	# A brp project dir is also a BR2_EXTERNAL dir, which requires
+	# external.desc to exist. Use that to determine if we are in a brp
+	# project dir.
+	local prj_dir=$(realpath "${PWD}")
+	while [[ "${prj_dir}" ]] && ! [[ -f "${prj_dir}/external.desc" ]]; do
+		prj_dir="${prj_dir%/*}"
+	done
+
+	if [[ "${prj_dir}" ]]; then
+		prog_dir="${prj_dir%/*}"
+	elif [[ "$0" =~ / ]]; then
+		prog_dir=$(realpath "${0%/*}")
+	else
+		prog_dir=''
+	fi
+
+	printf '%s\n' "${prog_dir:-${PWD}}"
 }
 
 # ----------------------------------------------------------------------------
