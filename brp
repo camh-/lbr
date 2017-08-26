@@ -23,11 +23,13 @@ Usage: $program_name <project> <board> <phase> [target]
 Phases are any name with a <project>/board/<board>/<phase> defconfig file.
 A phase named "toolchain" is handled specially in that you will be prompted
 to overwrite it if it already exists.
+<project> is optional if CWD is the project dir.
+<board> is also optional if CWD is the project's board dir.
 Targets are:
   build: Build the phase. This is the default.
   menuconfig: Run make menuconfig on the target, saving the minimal defconfig
     back in the configs directory.
-  oldconfig: Run make oldconfig oon the target, saving the minimal defconfig
+  oldconfig: Run make oldconfig on the target, saving the minimal defconfig
     back in the configs directory.
   clean: Remove the output directory for the phase.
 EOF
@@ -382,18 +384,12 @@ setup()
 {
 	program_name=${0##*/}
 
-	project="$1"
-	board="$2"
-	phase="$3"
-	target="${4:-build}"
+	BRP_ROOT=$(find_brp_root)
 
-	[[ -n "${project}" ]] || usage 1 >&2
-	[[ -n "${board}" ]] || usage 1 >&2
-	[[ -n "${phase}" ]] || usage 1 >&2
+	parse_args "$@"
 
 	load_config || return 1
 
-	BRP_ROOT=$(find_brp_root)
 	BRP_PROJECT_DIR="${BRP_ROOT}/${project}"
 	BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
 	BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
@@ -424,6 +420,32 @@ setup()
 
 	export BRP_PROJECT_DIR BRP_OUTPUT_ROOT BRP_OUTPUT_DIR BRP_IMAGE_DIR \
 		BRP_BOARD_DIR
+}
+
+# ----------------------------------------------------------------------------
+parse_args()
+# ----------------------------------------------------------------------------
+{
+	# Normal usage is:
+	#  brp <project> <board> <config> [action]
+	# but we can infer project and board from $PWD if appropriate.
+	# If we are in the project dir, then we don't require that arg.
+	# If we are in a projects board dir, we don't require those args.
+	if [[ ${PWD} =~ ${BRP_ROOT}/([^/]*)(/board/([^/]*))? ]]; then
+		if [[ -n "${BASH_REMATCH[3]-}" ]]; then
+			set -- "${BASH_REMATCH[3]}" "$@"
+		fi
+		set -- "${BASH_REMATCH[1]}" "$@"
+	fi
+
+	project="$1"
+	board="$2"
+	phase="$3"
+	target="${4:-build}"
+
+	[[ -n "${project}" ]] || usage 1 >&2
+	[[ -n "${board}" ]] || usage 1 >&2
+	[[ -n "${phase}" ]] || usage 1 >&2
 }
 
 # ----------------------------------------------------------------------------
