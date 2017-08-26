@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_clusterpi_PATH/package/nomad/Config.in"
