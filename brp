@@ -400,6 +400,8 @@ setup()
 	BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
 	BRP_BOARD_DIR="${BRP_PROJECT_DIR}/board/${board}"
 
+	find_buildroot
+
 	check_config || return 1
 
 	defconfig="${board}_${phase}_defconfig"
@@ -425,10 +427,22 @@ setup()
 }
 
 # ----------------------------------------------------------------------------
+find_buildroot()
+# ----------------------------------------------------------------------------
+{
+	if [[ -z "${buildroot-}" ]]; then
+		if [[ -e "${BRP_PROJECT_DIR}/buildroot" ]]; then
+			buildroot="${BRP_PROJECT_DIR}/buildroot"
+		elif [[ -e "${BRP_ROOT}"/buildroot ]]; then
+			buildroot="${BRP_ROOT}/buildroot"
+		fi
+	fi
+}
+
+# ----------------------------------------------------------------------------
 load_config()
 # ----------------------------------------------------------------------------
 {
-	local found=false
 	local -a xdg
 	IFS=: read -r -a xdg <<< "${XDG_CONFIG_DIRS:-/etc/xdg}"
 	local -a search=(
@@ -439,14 +453,8 @@ load_config()
 		if [[ -f "$path" ]] ; then
 			# shellcheck disable=SC1090
 			source "$path"
-			found=true
 		fi
 	done
-
-	if ! "${found}"; then
-		echo "No config file found. Searched: " "${search[@]}" >&2
-		return 1
-	fi
 
 	return 0
 }
