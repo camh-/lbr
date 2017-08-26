@@ -429,11 +429,8 @@ load_config()
 # ----------------------------------------------------------------------------
 {
 	local found=false
-	# shellcheck disable=SC2031
-	oldifs="$IFS"
-	IFS=:
-	local -a xdg=(${XDG_CONFIG_DIRS:-/etc/xdg})
-	IFS="$oldifs"
+	local -a xdg
+	IFS=: read -r -a xdg <<< "${XDG_CONFIG_DIRS:-/etc/xdg}"
 	local -a search=(
 		"${xdg[@]/%//brp}"
 		"${XDG_CONFIG_HOME:-$HOME/.config}/brp"
