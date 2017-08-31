@@ -79,7 +79,7 @@ target_menuconfig()
 # ----------------------------------------------------------------------------
 {
 	make_output_dirs
-	modify_buildroot_config menuconfig "$1"
+	make_config_target menuconfig "$1"
 }
 
 # ----------------------------------------------------------------------------
@@ -87,7 +87,7 @@ target_oldconfig()
 # ----------------------------------------------------------------------------
 {
 	make_output_dirs
-	modify_buildroot_config oldconfig "$1"
+	make_config_target oldconfig "$1"
 }
 
 # ----------------------------------------------------------------------------
@@ -202,9 +202,9 @@ create_default_config_if_missing()
 }
 
 # ----------------------------------------------------------------------------
-modify_buildroot_config()
+make_config_target()
 # ----------------------------------------------------------------------------
-# modify_buildroot_config make_target
+# make_config_target make_target
 # Run "make <make_target>" for <phase> and save the resulting minimal
 # defconfig in the configs directory.
 # If there is an existing minimal defconfig for <phase>, it will be used as
@@ -214,9 +214,7 @@ modify_buildroot_config()
 
 	create_default_config_if_missing "$1"
 
-	make_target "${make_target}" \
-	&& run ${MAKE} "${make_args[@]}" savedefconfig \
-	&& cp "${srcconfig}" "${brpconfig}"
+	run ${MAKE} "${make_args[@]}" defconfig "${make_target}" savedefconfig
 }
 
 # ============================================================================
@@ -232,8 +230,7 @@ make_target()
 		return 1
 	fi
 
-	cp "${brpconfig}" "${srcconfig}" \
-	&& run ${MAKE} "${make_args[@]}" "${defconfig}" \
+	run ${MAKE} "${make_args[@]}" defconfig \
 	&& run ${MAKE} "${make_args[@]}" "${make_target}"
 }
 
@@ -403,8 +400,6 @@ setup()
 
 	check_config || return 1
 
-	defconfig="${board}_${phase}_defconfig"
-	srcconfig="${BRP_PROJECT_DIR}/configs/${defconfig}"
 	brpconfig="${BRP_BOARD_DIR}/config/${phase}"
 
 	log_dir="${BRP_OUTPUT_DIR}"/logs
@@ -414,6 +409,7 @@ setup()
 		-C "${buildroot}"
 		"O=${BRP_OUTPUT_DIR}/${phase}"
 		"BR2_EXTERNAL=${BRP_ROOT}/core:${BRP_PROJECT_DIR}"
+		"BR2_DEFCONFIG=${brpconfig}"
 	)
 
 	[[ "$V" == '1' ]] && make_args+=("V=1")
