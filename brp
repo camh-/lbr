@@ -248,8 +248,7 @@ copy_image()
 {
 	src="${BRP_OUTPUT_DIR}/${phase}/images/$1"
 	dest="${BRP_IMAGE_DIR}"
-	[[ -n "$2" ]] && dest="$dest/$2"
-	run cp -a "$src" "$dest"
+	run cp -a "${src}" "${dest}/${2-}"
 }
 
 # ----------------------------------------------------------------------------
