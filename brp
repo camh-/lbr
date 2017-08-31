@@ -525,9 +525,7 @@ check_config()
 make_output_dirs()
 # ----------------------------------------------------------------------------
 {
-	run mkdir -p "${BRP_OUTPUT_DIR}"
-	run mkdir -p "${BRP_IMAGE_DIR}"
-	run mkdir -p "${log_dir}"
+	run mkdir -p "${BRP_OUTPUT_DIR}" "${BRP_IMAGE_DIR}" "${log_dir}"
 }
 
 # ----------------------------------------------------------------------------
