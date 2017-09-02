@@ -16,3 +16,11 @@ config BR2_BUILD_OVERLAY
 	 is executed, by adding $(BR2_EXTERNAL_BRP_CORE_PATH)/post-build.sh
 	 to BR2_ROOTFS_POST_BUILD_SCRIPT.
 
+config BR2_OVERLAY_IMAGES
+	string "Phase image overlays to add to this phase"
+	help
+	  Overlay images to incorporate into this build.
+
+	  Image names should be specified as <phase> or <board>/<phase>.
+	  Image names without a <board> refer to the current board.
+

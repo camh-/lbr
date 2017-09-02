@@ -81,6 +81,14 @@ post_fakeroot() {
     rm_unwanted "${target_dir}" "${unwanted[@]}"
     clean_empty "${target_dir}"
   fi
+
+  local image_file
+  config_get BR2_OVERLAY_IMAGES
+  for image in ${BR2_OVERLAY_IMAGES-}; do
+    image_file=$(get_image_file "${image}") || continue
+    message "Extracting image ${image}"
+    tar -x -f "${image_file}" -C "${target_dir}"
+  done
 }
 
 #-----------------------------------------------------------------------------
@@ -114,6 +122,32 @@ clean_empty() {
     link_count=$(find "$1" -xtype l -print -delete | wc -l)
     dir_count=$(find "$1" -mindepth 1 -type d -empty -print -delete | wc -l)
   done
+}
+
+#-----------------------------------------------------------------------------
+get_image_file() {
+  # $1: image name, either <board>/<phase> or <phase>. In the latter case,
+  #     the board is the same as what we are.
+  if [[ "$1" =~ ([^/]*)/([^/]*) ]]; then
+    local image_dir="${BRP_OUTPUT_ROOT}/${BASH_REMATCH[1]}/images"
+    local image_phase="${BASH_REMATCH[2]}"
+  else
+    local image_dir="${BRP_IMAGE_DIR}"
+    local image_phase="$1"
+  fi
+  shopt -s nullglob
+  local image_file=("${image_dir}/rootfs-${image_phase}.tar"*)
+  case "${#image_file[@]}" in
+    0)
+      printf 'Could not locate image: %s\n' "$1" >&2
+      ;;
+    1)
+      printf '%s\n' "${image_file[0]}"
+      ;;
+    *)
+      printf 'Found multiple image archives for image: %s\n' "$1" >&2
+      ;;
+  esac
 }
 
 #-----------------------------------------------------------------------------
