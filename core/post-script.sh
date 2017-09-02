@@ -7,6 +7,11 @@
 # correct function. Those names should be symlinks to this script.
 #
 #-----------------------------------------------------------------------------
+
+KCONFIG="${BR2_CONFIG}"
+source "${BRP_ROOT}"/kconfig.sh
+
+#-----------------------------------------------------------------------------
 usage() {
   printf 'Usage: post-build <target-dir>\n'
   printf 'Usage: post-fakeroot <target-dir>\n'
@@ -63,7 +68,7 @@ post_build() {
       /usr/lib32
   )
 
-  if config_y BR2_BUILD_OVERLAY; then
+  if kconfig_y BR2_BUILD_OVERLAY; then
     message "Cleaning target dir for overlay"
     rm_unwanted "${target_dir}" "${unwanted[@]}"
     clean_empty "${target_dir}"
@@ -77,14 +82,14 @@ post_fakeroot() {
       /dev/console
   )
 
-  if config_y BR2_BUILD_OVERLAY; then
+  if kconfig_y BR2_BUILD_OVERLAY; then
     message "Cleaning target dir for overlay"
     rm_unwanted "${target_dir}" "${unwanted[@]}"
     clean_empty "${target_dir}"
   fi
 
   local image_file
-  config_get BR2_OVERLAY_IMAGES
+  kconfig_get BR2_OVERLAY_IMAGES
   for image in ${BR2_OVERLAY_IMAGES-}; do
     image_file=$(get_image_file "${image}") || continue
     message "Extracting image ${image}"
@@ -96,22 +101,6 @@ post_fakeroot() {
 post_image() {
   local image_dir="$1"
   copy_images "${image_dir}"
-}
-
-#-----------------------------------------------------------------------------
-config_y() {
-  config_get "$1"
-  [[ "${!1-n}" == 'y' ]]
-}
-
-#-----------------------------------------------------------------------------
-# Get config settings from BR2_CONFIG file. Option will be set as environment
-# variable if set in config, unset otherwise.
-config_get() {
-  for var; do
-    unset "${var}"
-    eval $(grep -w "^${var}" "${BR2_CONFIG}")
-  done
 }
 
 #-----------------------------------------------------------------------------
