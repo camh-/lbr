@@ -465,7 +465,7 @@ find_brp_root()
 	if [[ "${prj_dir}" ]]; then
 		prog_dir="${prj_dir%/*}"
 	elif [[ "$0" =~ / ]]; then
-		prog_dir=$(realpath "${0%/*}")
+		prog_dir=$(dirname "$(realpath "$0")")
 	else
 		prog_dir=''
 	fi
