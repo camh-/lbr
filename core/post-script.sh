@@ -171,6 +171,13 @@ copy_images() {
     if [[ "${image_name}" =~ ^rootfs\.[^.]*$ ]] && globmatch "${image}.*"; then
       continue
     fi
+    # don't copy an empty image tar file
+    if [[ "${image_name}" =~ ^rootfs\.tar* ]]; then
+      if [[ "$(tar -t -f "${image}")" == './' ]]; then
+        printf 'Not copying empty image %s\n' "${image_name}"
+        continue
+      fi
+    fi
     cp -a "${image}" "${BRP_IMAGE_DIR}/${image_name/rootfs/rootfs-${BRP_PHASE}}"
   done
 }
