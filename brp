@@ -122,10 +122,10 @@ build()
 # Build a phase into its own output directory, logging the process.
 # "make $board_<phase>_defconfig" is run first to set up the configuration
 # for the phase
-# $1: The name of the phase. The output directory and log will be named this.
+# $1: (optional) Target to build. Defaults to "all".
 {
 	make_output_dirs
-	make_target all 2>&1 | tee "${log_dir}/${phase}.log"
+	make_target "${1:-all}" 2>&1 | tee "${log_dir}/${phase}.log"
 	return "${PIPESTATUS[0]}"
 }
 
