@@ -24,3 +24,13 @@ config BR2_OVERLAY_IMAGES
 	  Image names should be specified as <phase> or <board>/<phase>.
 	  Image names without a <board> refer to the current board.
 
+config BR2_BUILD_BOARD_IMAGE
+	bool "Build ultimate board image"
+	default n
+	help
+	  Build the ultimate image for the board.
+
+	  This is done by invoking the build-image.sh script in the
+	  board directory. The current working directory will be the
+	  board image directory when build-image.sh is invoked (not
+	  the phase image directory).

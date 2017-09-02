@@ -100,7 +100,19 @@ post_fakeroot() {
 #-----------------------------------------------------------------------------
 post_image() {
   local image_dir="$1"
+
+  message 'Copying images to board dir'
   copy_images "${image_dir}"
+
+  if kconfig_y BR2_BUILD_BOARD_IMAGE; then
+    if [[ -x "${BRP_BOARD_DIR}/build-image.sh" ]]; then
+      message 'Building board image'
+      (
+        cd "${BRP_IMAGE_DIR}" && \
+          "${BRP_BOARD_DIR}/build-image.sh" "${BRP_IMAGE_DIR}"
+      )
+    fi
+  fi
 }
 
 #-----------------------------------------------------------------------------

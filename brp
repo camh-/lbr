@@ -158,27 +158,6 @@ build_toolchain()
 	default_build
 }
 
-# ----------------------------------------------------------------------------
-build_final()
-# ----------------------------------------------------------------------------
-# A special final phase that copies the rootfs images without renaming them
-# and runs a build-image.sh script from the board directory after that, with
-# the intention that the script builds the flash/sdcard/etc images from the
-# parts built in the various phases.
-{
-	if [[ -f "${brpconfig}" ]] ; then
-		{ build && copy_images 'norename'; } || return
-	fi
-
-	if [[ -x "${BRP_BOARD_DIR}/build-image.sh" ]] ; then
-		(
-		add_host_path
-		cd "${BRP_IMAGE_DIR}" && \
-		"${BRP_BOARD_DIR}/build-image.sh" "${BRP_IMAGE_DIR}"
-		)
-	fi
-}
-
 # ============================================================================
 # CONFIG target functions
 # These functions implement the various config targets, currently
@@ -232,44 +211,6 @@ make_target()
 
 	run ${MAKE} "${make_args[@]}" defconfig \
 	&& run ${MAKE} "${make_args[@]}" "${make_target}"
-}
-
-# ----------------------------------------------------------------------------
-copy_image()
-# ----------------------------------------------------------------------------
-# copy_image <image_name> [dest_image_name]
-# Copy an image from an output directory into the board saved image directory.
-# $1: The name of the image to copy.
-# $2: (Optional) The name of the image after copying. If not supplied, the
-#     image keeps the same name.
-{
-	src="${BRP_OUTPUT_DIR}/${phase}/images/$1"
-	dest="${BRP_IMAGE_DIR}"
-	run cp -a "${src}" "${dest}/${2-}"
-}
-
-# ----------------------------------------------------------------------------
-copy_images()
-# ----------------------------------------------------------------------------
-# copy_images
-# Copy all images from <phase>'s image directory, except the uncompressed
-# rootfs image in there is a compressed one. The rootfs image is renamed
-# to include <phase> in its name, unless "$1" == 'norename'.
-{
-	srcdir="${BRP_OUTPUT_DIR}/${phase}/images"
-	for src in "${srcdir}"/* ; do
-		[[ "$src" = "${srcdir}/*" ]] && continue
-		srcname="${src##*/}"
-		if [[ "$1" != 'norename' ]] ; then
-			newname="${srcname/rootfs/rootfs-${phase}}"
-		fi
-		# Don't copy uncompressed rootfs if there's a compressed one.
-		if [[ "$srcname" =~ ^rootfs\.[^\.]*$ ]] && globmatch "${src}.*"
-		then
-			continue
-		fi
-		copy_image "$srcname" "${newname-}"
-	done
 }
 
 # ============================================================================
@@ -329,44 +270,6 @@ clean_tmp()
 	rm -rf "${tmp_dir}"
 	tmp_dir=""
 	trap - EXIT
-}
-
-# ----------------------------------------------------------------------------
-globmatch()
-# ----------------------------------------------------------------------------
-# $1: A glob pattern
-# Returns true if $1 matches any files, false if not
-{
-	compgen -G "$1" > /dev/null
-}
-
-# ----------------------------------------------------------------------------
-sep()
-# ----------------------------------------------------------------------------
-# Output arguments seperated by $1
-{
-	# shellcheck disable=SC2030
-	(IFS="$1"; shift; echo "$*")
-}
-
-# ----------------------------------------------------------------------------
-prepend_path()
-# ----------------------------------------------------------------------------
-# Prepend arguments to $PATH
-{
-	PATH=$(sep : "$@" "${PATH}")
-}
-
-# ----------------------------------------------------------------------------
-add_host_path()
-# ----------------------------------------------------------------------------
-# Add the host tools to PATH. This is the "host" directory of a build phase.
-# Currently that is hardcoded as the "host" phase and must be a phase of
-# the current board. This will probably change in future to be more flexible
-# (probably to have it in the toolchain "board" as the host tools do not
-# need to be defined or built for every board).
-{
-	prepend_path "${BRP_OUTPUT_DIR}"/host/host/{,usr/}{bin,sbin}
 }
 
 # ============================================================================
