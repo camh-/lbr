@@ -96,7 +96,7 @@ target_clean()
 {
 	if [[ -n "${BRP_OUTPUT_DIR}" ]] && [[ -n "${phase}" ]]; then
 		# shellcheck disable=SC2115
-		rm -rf "${BRP_OUTPUT_DIR}/${phase}"
+		run rm -rf "${BRP_OUTPUT_DIR}/${phase}"
 	fi
 }
 
