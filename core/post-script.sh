@@ -1,21 +1,22 @@
 #!/bin/bash
 # vim: set ts=8 sw=2 sts=2 et sta fileencoding=utf-8:
 #
-# post-build and post-fakeroot script for core brp features.
+# post-build, post-fakeroot and post-image script for core brp features.
 # One script because there is a lot of common functionality, but should be
-# named post-build.sh or post-fakeroot.sh to invoke the correct function.
-# Those names should be symlinks to this script.
+# named post-build.sh, post-fakeroot.sh or post-image.sh to invoke the
+# correct function. Those names should be symlinks to this script.
 #
 #-----------------------------------------------------------------------------
 usage() {
   printf 'Usage: post-build <target-dir>\n'
   printf 'Usage: post-fakeroot <target-dir>\n'
+  printf 'Usage: post-image <image-dir>\n'
 }
 
 #-----------------------------------------------------------------------------
 main() {
   parse_args "$@"
-  if [[ "$0" =~ /post-(build|fakeroot) ]]; then
+  if [[ "$0" =~ /post-(build|fakeroot|image) ]]; then
     function="${BASH_REMATCH[1]}"
   else
     printf 'Called with unknown name: %s\n' "${0##*/}" >&2
@@ -92,6 +93,12 @@ post_fakeroot() {
 }
 
 #-----------------------------------------------------------------------------
+post_image() {
+  local image_dir="$1"
+  copy_images "${image_dir}"
+}
+
+#-----------------------------------------------------------------------------
 config_y() {
   config_get "$1"
   [[ "${!1-n}" == 'y' ]]
@@ -148,6 +155,24 @@ get_image_file() {
       printf 'Found multiple image archives for image: %s\n' "$1" >&2
       ;;
   esac
+}
+
+#-----------------------------------------------------------------------------
+# Copy images from a phase image directory to the board image directory.
+# rootfs images will be renamed to add "-<phase>" into the name.
+# An uncompressed rootfs image will not be copied if there is also a
+# compressed rootfs image. Only the compressed image will be copied.
+# All other non-rootfs images will be copied.
+copy_images() {
+  shopt -s nullglob
+  for image in "$1"/*; do
+    local image_name="${image##*/}"
+    # don't copy an uncompressed rootfs if there's a compressed one.
+    if [[ "${image_name}" =~ ^rootfs\.[^.]*$ ]] && globmatch "${image}.*"; then
+      continue
+    fi
+    cp -a "${image}" "${BRP_IMAGE_DIR}/${image_name/rootfs/rootfs-${BRP_PHASE}}"
+  done
 }
 
 #-----------------------------------------------------------------------------
