@@ -13,6 +13,7 @@ source "${BRP_ROOT}"/kconfig.sh
 
 #-----------------------------------------------------------------------------
 usage() {
+  printf 'Usage: post-config <script-dir>\n'
   printf 'Usage: post-build <target-dir>\n'
   printf 'Usage: post-fakeroot <target-dir>\n'
   printf 'Usage: post-image <image-dir>\n'
@@ -21,7 +22,7 @@ usage() {
 #-----------------------------------------------------------------------------
 main() {
   parse_args "$@"
-  if [[ "$0" =~ /post-(build|fakeroot|image) ]]; then
+  if [[ "$0" =~ /post-(config|build|fakeroot|image) ]]; then
     function="${BASH_REMATCH[1]}"
   else
     printf 'Called with unknown name: %s\n' "${0##*/}" >&2
@@ -56,6 +57,28 @@ parse_args() {
   shift $((OPTIND-1))
 
   # Process remaining in "$@"
+}
+
+#-----------------------------------------------------------------------------
+post_config() {
+  # Ensure buildroot runs our post-{build,fakeroot,image}.sh scripts
+  local d='$(BR2_EXTERNAL_BRP_CORE_PATH)'
+  kconfig_str_append BR2_ROOTFS_POST_BUILD_SCRIPT "${d}/post-build.sh"
+  kconfig_str_append BR2_ROOTFS_POST_FAKEROOT_SCRIPT "${d}/post-fakeroot.sh"
+  kconfig_str_append BR2_ROOTFS_POST_IMAGE_SCRIPT "${d}/post-image.sh"
+
+  # Override some defaults when building an overlay image
+  if kconfig_y BR2_BUILD_OVERLAY; then
+
+    # Use an empty skeleton if none configured
+    if kconfig_y BR2_ROOTFS_SKELETON_CUSTOM; then
+      kconfig_get BR2_ROOTFS_SKELETON_CUSTOM_PATH
+      if [[ -z "${BR2_ROOTFS_SKELETON_CUSTOM_PATH-}" ]]; then
+        kconfig_str_set BR2_ROOTFS_SKELETON_CUSTOM_PATH "${d}/skeleton"
+      fi
+    fi
+
+  fi  # BR2_BUILD_OVERLAY=y
 }
 
 #-----------------------------------------------------------------------------

@@ -210,7 +210,27 @@ make_target()
 	fi
 
 	run ${MAKE} "${make_args[@]}" defconfig \
+	&& post_config \
+	&& run ${MAKE} "${make_args[@]}" olddefconfig \
 	&& run ${MAKE} "${make_args[@]}" "${make_target}"
+}
+
+# ----------------------------------------------------------------------------
+post_config()
+# ----------------------------------------------------------------------------
+# Run the post-config.sh script in each BR2_EXTERNAL dir. Set BR2_CONFIG
+# appropriately.
+{
+	IFS=: read -r -a ext_dirs <<<"${BR2_EXTERNAL}"
+	for dir in "${ext_dirs[@]}"; do (
+		if [[ -x "${dir}/post-config.sh" ]]; then
+			message post-config "${dir}"
+			BR2_CONFIG="${BRP_OUTPUT_DIR}/${BRP_PHASE}/.config"
+			export BR2_CONFIG
+			cd "${dir}"
+			run "${dir}/post-config.sh" "${dir}"
+		fi
+	) done
 }
 
 # ============================================================================
@@ -272,6 +292,15 @@ clean_tmp()
 	trap - EXIT
 }
 
+# ----------------------------------------------------------------------------
+message()
+# ----------------------------------------------------------------------------
+{
+	tput smso
+	printf '>>> %s\n' "$*"
+	tput rmso
+}
+
 # ============================================================================
 # SETUP
 # Functions to read the config and set up the environment that the rest of
@@ -308,11 +337,11 @@ setup()
 	log_dir="${BRP_OUTPUT_DIR}"/logs
 	tmp_dir=""
 
+	export BR2_EXTERNAL="${BRP_ROOT}/core:${BRP_PROJECT_DIR}"
+	export BR2_DEFCONFIG="${brpconfig}"
 	make_args=(
 		-C "${buildroot}"
 		"O=${BRP_OUTPUT_DIR}/${phase}"
-		"BR2_EXTERNAL=${BRP_ROOT}/core:${BRP_PROJECT_DIR}"
-		"BR2_DEFCONFIG=${brpconfig}"
 	)
 
 	[[ "$V" == '1' ]] && make_args+=("V=1")
