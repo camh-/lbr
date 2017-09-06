@@ -78,7 +78,6 @@ target_build()
 target_menuconfig()
 # ----------------------------------------------------------------------------
 {
-	make_output_dirs
 	make_config_target menuconfig "$1"
 }
 
@@ -86,7 +85,6 @@ target_menuconfig()
 target_oldconfig()
 # ----------------------------------------------------------------------------
 {
-	make_output_dirs
 	make_config_target oldconfig "$1"
 }
 
@@ -124,7 +122,6 @@ build()
 # for the phase
 # $1: (optional) Target to build. Defaults to "all".
 {
-	make_output_dirs
 	make_target "${1:-all}" 2>&1 | tee "${log_dir}/${phase}.log"
 	return "${PIPESTATUS[0]}"
 }
@@ -342,6 +339,8 @@ setup()
 	force=0
 	dryrun=0
 
+	make_output_dirs
+
 	export BRP_ROOT BRP_PROJECT_DIR BRP_OUTPUT_ROOT BRP_OUTPUT_DIR \
 		BRP_IMAGE_DIR BRP_BOARD_DIR BRP_PROJECT BRP_BOARD BRP_PHASE
 }
@@ -450,7 +449,16 @@ check_config()
 make_output_dirs()
 # ----------------------------------------------------------------------------
 {
-	run mkdir -p "${BRP_OUTPUT_DIR}" "${BRP_IMAGE_DIR}" "${log_dir}"
+	for dir in "${BRP_OUTPUT_DIR}" "${BRP_IMAGE_DIR}" "${log_dir}"; do
+		if [[ ! -d "${dir}" ]]; then
+			if [[ ! -e "${dir}" ]]; then
+				run mkdir -p "${dir}"
+			else
+				echo "Cannot mkdir ${dir}" >&2
+				exit 1
+			fi
+		fi
+	done
 }
 
 # ----------------------------------------------------------------------------
