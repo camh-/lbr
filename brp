@@ -19,8 +19,8 @@ usage()
 # ----------------------------------------------------------------------------
 {
 	cat <<EOF
-Usage: $program_name <project> <board> <phase> [target]
-Phases are any name with a <project>/board/<board>/<phase> defconfig file.
+Usage: $program_name <target> [project] [board] <phase>
+Phases are defined with a <project>/board/<board>/config/<phase> defconfig file.
 A phase named "sdk" is handled specially in that you will be prompted
 to overwrite it if it already exists.
 <project> is optional if CWD is the project dir.
@@ -32,6 +32,7 @@ Targets are:
   oldconfig: Run make oldconfig on the target, saving the minimal defconfig
     back in the configs directory.
   clean: Remove the output directory for the phase.
+  <other>: Other target are passed through to buildroot make.
 EOF
 	[[ -z "$1" ]] || exit "$1"
 }
@@ -350,21 +351,22 @@ parse_args()
 # ----------------------------------------------------------------------------
 {
 	# Normal usage is:
-	#  brp <project> <board> <config> [action]
+	#  brp <target> <project> <board> <config>
 	# but we can infer project and board from $PWD if appropriate.
 	# If we are in the project dir, then we don't require that arg.
 	# If we are in a projects board dir, we don't require those args.
+	# Use these CWD defaults if not explicitly given on the cmdline.
 	if [[ ${PWD} =~ ${BRP_ROOT}/([^/]*)(/board/([^/]*))? ]]; then
 		if [[ -n "${BASH_REMATCH[3]-}" ]]; then
-			set -- "${BASH_REMATCH[3]}" "$@"
+			board="${BASH_REMATCH[3]}"
 		fi
-		set -- "${BASH_REMATCH[1]}" "$@"
+		project="${BASH_REMATCH[1]}"
 	fi
 
-	project="$1"
-	board="$2"
-	phase="$3"
-	target="${4:-build}"
+	target="$1"; shift
+	(( $# == 3 )) && { project="$1"; shift; }
+	(( $# == 2 )) && { board="$1"; shift; }
+	phase="$1"
 
 	[[ -n "${project}" ]] || usage 1 >&2
 	[[ -n "${board}" ]] || usage 1 >&2
