@@ -3,7 +3,7 @@
 # buildroot phased build script
 #
 # This script exists to orchestrate the multiple phases of buildroot that are
-# used to generate the toolchain, bootloader, kernel image and the base
+# used to generate the sdk, bootloader, kernel image and the base
 # root filesystem.
 #
 
@@ -21,7 +21,7 @@ usage()
 	cat <<EOF
 Usage: $program_name <project> <board> <phase> [target]
 Phases are any name with a <project>/board/<board>/<phase> defconfig file.
-A phase named "toolchain" is handled specially in that you will be prompted
+A phase named "sdk" is handled specially in that you will be prompted
 to overwrite it if it already exists.
 <project> is optional if CWD is the project dir.
 <board> is also optional if CWD is the project's board dir.
@@ -70,7 +70,7 @@ target_build()
 	if phase_has_build_function "${phase}" ; then
 		eval "build_${phase}"
 	else
-		default_build
+		build
 	fi
 }
 
@@ -130,24 +130,17 @@ build()
 }
 
 # ----------------------------------------------------------------------------
-default_build()
-# ----------------------------------------------------------------------------
-{
-	build
-}
-
-# ----------------------------------------------------------------------------
-build_toolchain()
+build_sdk()
 # TODO: Make this generically configurable in the config file (i.e. be able
 # to define a phase as "protect" or something.
 # ----------------------------------------------------------------------------
 {
 	# Give the user an option to bail out if we detect an already-
-	# installed toolchain
-	# source the toolchain buildroot config to get the install location
-	eval "$(grep -w ^BR2_HOST_DIR "${BRP_BOARD_DIR}/config/toolchain")"
+	# installed sdk
+	# source the sdk buildroot config to get the install location
+	eval "$(grep -w ^BR2_HOST_DIR "${BRP_BOARD_DIR}/config/sdk")"
 	if [[ -d "${BR2_HOST_DIR}" && "${force}" -eq 0 ]] ; then
-		echo "Toolchain already exists in ${BR2_HOST_DIR}"
+		echo "SDK already exists in ${BR2_HOST_DIR}"
 		read -r -p "Proceed [y/N]? " result
 		if [[ "${result}" != y && "${result}" != Y ]] ; then
 			echo "Aborting"
@@ -155,7 +148,7 @@ build_toolchain()
 		fi
 	fi
 
-	default_build
+	build sdk
 }
 
 # ============================================================================
@@ -167,7 +160,7 @@ build_toolchain()
 create_default_config_if_missing()
 # ----------------------------------------------------------------------------
 {
-	defaultconfig="${BRP_BOARD_DIR}/toolchain/config/toolchain_client"
+	defaultconfig="${BRP_BOARD_DIR}/sdk/config/sdk_client"
 
 	# Create a default config file if one does not exist
 	if [[ ! -f "${brpconfig}" ]] ; then
