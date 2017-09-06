@@ -9,6 +9,11 @@
 
 # =============================================================================
 
+script_dir=$(dirname $(realpath "$0"))
+source "${script_dir}/kconfig.sh"
+
+# ----------------------------------------------------------------------------
+
 MAKE=make
 
 # =============================================================================
@@ -136,7 +141,7 @@ build_sdk()
 	# Give the user an option to bail out if we detect an already-
 	# installed sdk
 	# source the sdk buildroot config to get the install location
-	eval "$(grep -w ^BR2_HOST_DIR "${BRP_BOARD_DIR}/config/sdk")"
+	kconfig_get BR2_HOST_DIR "${BRP_BOARD_DIR}/config/sdk"
 	if [[ -d "${BR2_HOST_DIR}" && "${force}" -eq 0 ]] ; then
 		echo "SDK already exists in ${BR2_HOST_DIR}"
 		read -r -p "Proceed [y/N]? " result
