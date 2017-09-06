@@ -119,8 +119,8 @@ build()
 # ----------------------------------------------------------------------------
 # build
 # Build a phase into its own output directory, logging the process.
-# "make $board_<phase>_defconfig" is run first to set up the configuration
-# for the phase
+# "make defconfig" is run first to set up the configuration for the phase,
+#   with BR2_DEFCONFIG pointing to the phase's config.
 # $1: (optional) Target to build. Defaults to "all".
 {
 	make_target "${1:-all}" 2>&1 | tee "${log_dir}/${phase}.log"
