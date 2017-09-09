@@ -255,40 +255,6 @@ run()
 }
 
 # ----------------------------------------------------------------------------
-start_tmp()
-# ----------------------------------------------------------------------------
-# Create a temporary directory and put its name in $tmp_dir. 
-# This function will install an EXIT handler so that if the shell script
-# exits before the directory is removed then it will get removed on exit.
-# The caller should call end_tmp() when they no longer need the temp dir
-# Returns true if we could create the tmp_dir, false if not.
-{
-	[[ -z "${tmp_dir}" ]] || return 1
-	trap clean_tmp EXIT
-	tmp_dir=$(mktemp -d)
-}
-
-# ----------------------------------------------------------------------------
-end_tmp()
-# ----------------------------------------------------------------------------
-# End use of the global temp directory.
-# This function will remove the temp directory and EXIT handler.
-{
-	clean_tmp
-}
-
-# ----------------------------------------------------------------------------
-clean_tmp()
-# ----------------------------------------------------------------------------
-# Remove the directory in $tmp_dir if that variable is set.
-{
-	[[ -n "${tmp_dir}" ]] || return 1
-	rm -rf "${tmp_dir}"
-	tmp_dir=""
-	trap - EXIT
-}
-
-# ----------------------------------------------------------------------------
 message()
 # ----------------------------------------------------------------------------
 {
@@ -331,7 +297,6 @@ setup()
 	brpconfig="${BRP_BOARD_DIR}/config/${phase}"
 
 	log_dir="${BRP_OUTPUT_DIR}"/logs
-	tmp_dir=""
 
 	export BR2_EXTERNAL="${BRP_ROOT}/core:${BRP_PROJECT_DIR}"
 	export BR2_DEFCONFIG="${brpconfig}"
