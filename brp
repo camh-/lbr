@@ -160,23 +160,6 @@ build_sdk()
 # menuconfig and oldconfig
 
 # ----------------------------------------------------------------------------
-create_default_config_if_missing()
-# ----------------------------------------------------------------------------
-{
-	defaultconfig="${BRP_BOARD_DIR}/sdk/config/sdk_client"
-
-	# Create a default config file if one does not exist
-	if [[ ! -f "${brpconfig}" ]] ; then
-		mkdir -p "${brpconfig%/*}"
-		if [[ -f "${defaultconfig}" ]] ; then
-			run cp "${defaultconfig}" "${brpconfig}"
-		else
-			run touch "${brpconfig}"
-		fi
-	fi
-}
-
-# ----------------------------------------------------------------------------
 make_config_target()
 # ----------------------------------------------------------------------------
 # make_config_target make_target
@@ -187,9 +170,103 @@ make_config_target()
 {
 	make_target="$1"
 
-	create_default_config_if_missing "$1"
+	[[ -f "${brpconfig}" ]] || run touch "${brpconfig}"
 
+	merge_config
 	run ${MAKE} "${make_args[@]}" defconfig "${make_target}" savedefconfig
+	demerge_config
+}
+
+# ----------------------------------------------------------------------------
+merge_config()
+# ----------------------------------------------------------------------------
+# Merge the config fragments listed in the BRP_CONFIG_FRAGMENTS of the
+# current phases fragment file and write out a defconfig file to the
+# output directory (BR2_DEFCONFIG).
+{
+	kconfig_get BRP_CONFIG_FRAGMENTS "${brpconfig}"
+	local -a fragments
+	fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
+	kconfig_merge "${fragments[@]}" "${brpconfig}" > "${BR2_DEFCONFIG}"
+}
+
+# ----------------------------------------------------------------------------
+demerge_config()
+# ----------------------------------------------------------------------------
+# Subtract the fragments listed in the BRP_CONFIG_FRAGMENTS of the current
+# phases defconfig file (BR2_DEFCONFIG) from that defconfig file and write
+# out a fragment file containing the remaining config options. Whiteout
+# entries are written where the current phases defconfig file does not have
+# a setting for a variable that is set in one of the fragments. This occurs
+# when a defconfig resets a setting to a default value that has been set to
+# a non-default value in a fragment. Omitting the setting altogether in the
+# fragment would see the setting have the value from the fragment and not
+# the default value when the fragments are re-merged.
+{
+	kconfig_get BRP_CONFIG_FRAGMENTS "${BR2_DEFCONFIG}"
+	local -a fragments
+	fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
+	kconfig_demerge "${BR2_DEFCONFIG}" "${fragments[@]}" > "${brpconfig}"
+}
+
+# ----------------------------------------------------------------------------
+find_fragments()
+# ----------------------------------------------------------------------------
+# find_fragments <fragment>...
+# Find each of the given fragments in the fragment search path.
+{
+	for fragment; do
+		find_fragment "${fragment}" || exit 1
+	done
+}
+
+# ----------------------------------------------------------------------------
+find_fragment()
+# ----------------------------------------------------------------------------
+# find_fragment <fragment>
+# $1: name of fragment file.
+# Search for a defconfig fragment named <fragment> starting at the current
+# board directory, and following the chain of parents back from the board
+# dir. Also look in the project directory and the core directory.
+# The search stops when the named fragment is found.
+{
+	local fragment="$1" dir
+	local -a parents cfg_dirs
+	get_parents parents "${BRP_BOARD_DIR}"
+	cfg_dirs=("${BRP_BOARD_DIR}" \
+		  "${parents[@]}" \
+		  "${BRP_PROJECT_DIR}" \
+		  "${BRP_CORE_DIR}"
+	)
+	for dir in "${cfg_dirs[@]}"; do
+		local f="${dir}/config/${fragment}"
+		if [[ -f "${f}" ]]; then
+			printf '%s\n' "${f}"
+			return 0
+		fi
+	done
+
+	printf 'Could not find defconfig fragment: %s\n' "${fragment}" >&2
+	return 1
+}
+
+# ----------------------------------------------------------------------------
+get_parents()
+# ----------------------------------------------------------------------------
+# get_parents <array_name> <board_dir>
+# Find all the parent directories of a board directory.
+# Parent directories are found by following the "parent" symlink in each
+# board dir until there are no more "parent" symlinks.
+# $1: Name of array to put the parent dirs in.
+# $2: The board directory to start from.
+{
+	local -n _parents="$1"
+	local dir="$2"
+
+	while [[ -d "${dir}/parent" ]]; do
+		dir=$(realpath "${dir}/parent")
+		_parents+=("${dir}")
+	done
 }
 
 # ============================================================================
@@ -205,6 +282,7 @@ make_target()
 		return 1
 	fi
 
+	merge_config
 	run ${MAKE} "${make_args[@]}" defconfig \
 	&& post_config \
 	&& run ${MAKE} "${make_args[@]}" olddefconfig \
@@ -280,6 +358,7 @@ setup()
 
 	load_config || return 1
 
+	BRP_CORE_DIR="${BRP_ROOT}/core"
 	BRP_PROJECT_DIR="${BRP_ROOT}/${project}"
 	BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
 	BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
@@ -298,8 +377,8 @@ setup()
 
 	log_dir="${BRP_OUTPUT_DIR}"/logs
 
-	export BR2_EXTERNAL="${BRP_ROOT}/core:${BRP_PROJECT_DIR}"
-	export BR2_DEFCONFIG="${brpconfig}"
+	export BR2_EXTERNAL="${BRP_CORE_DIR}:${BRP_PROJECT_DIR}"
+	export BR2_DEFCONFIG="${BRP_OUTPUT_DIR}/${phase}/defconfig"
 	make_args=(
 		-C "${buildroot}"
 		"O=${BRP_OUTPUT_DIR}/${phase}"
@@ -421,7 +500,8 @@ check_config()
 make_output_dirs()
 # ----------------------------------------------------------------------------
 {
-	for dir in "${BRP_OUTPUT_DIR}" "${BRP_IMAGE_DIR}" "${log_dir}"; do
+	for dir in "${BRP_OUTPUT_DIR}" "${BRP_IMAGE_DIR}" "${log_dir}" \
+		"${BRP_OUTPUT_DIR}/${phase}"; do
 		if [[ ! -d "${dir}" ]]; then
 			if [[ ! -e "${dir}" ]]; then
 				run mkdir -p "${dir}"

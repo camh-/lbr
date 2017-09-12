@@ -1,3 +1,23 @@
+config BRP_CONFIG_FRAGMENTS
+	string "Fragments to add to this config"
+	help
+	  Fragments to combine to create the defconfig.
+
+	  The defconfig for the build can be build from fragments so you
+	  do not need to specify the same configuration for multiple
+	  phases. Each fragment is applied in order with this config
+	  being applied last. The latest value for a setting overrides
+	  any previous values.
+
+	  When the defconfig for this phase is saved, the fragments are
+	  removed so as to leave a minimal defconfig that contains only
+	  the configuration items specific to this phase.
+
+	  Config fragments are found by searching in the board's config
+	  directory, the config directory of each element in the parent
+	  chain for the board, the project's config directory and the
+	  core config directory, in that order.
+
 config BR2_BUILD_OVERLAY
        bool "Build an overlay-only image"
        default n
