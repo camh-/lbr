@@ -1,6 +1,0 @@
-* Define phases in config
-* Mark phases as protected (toolchain)
-* Mark phase as template (toolchain_client)
-* Specify phase deps in config
-  + Generate overlay BR2 config from phase deps
-* Re-write as Makefile
