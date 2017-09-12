@@ -68,7 +68,7 @@ post_config() {
   kconfig_str_append BR2_ROOTFS_POST_IMAGE_SCRIPT "${d}/post-image.sh"
 
   # Override some defaults when building an overlay image
-  if kconfig_y BR2_BUILD_OVERLAY; then
+  if kconfig_y BRP_BUILD_OVERLAY; then
 
     # Use an empty skeleton if none configured
     if kconfig_y BR2_ROOTFS_SKELETON_CUSTOM; then
@@ -78,7 +78,7 @@ post_config() {
       fi
     fi
 
-  fi  # BR2_BUILD_OVERLAY=y
+  fi  # BRP_BUILD_OVERLAY=y
 }
 
 #-----------------------------------------------------------------------------
@@ -91,7 +91,7 @@ post_build() {
       /usr/lib32
   )
 
-  if kconfig_y BR2_BUILD_OVERLAY; then
+  if kconfig_y BRP_BUILD_OVERLAY; then
     message "Cleaning target dir for overlay"
     rm_unwanted "${target_dir}" "${unwanted[@]}"
     clean_empty "${target_dir}"
@@ -105,15 +105,15 @@ post_fakeroot() {
       /dev/console
   )
 
-  if kconfig_y BR2_BUILD_OVERLAY; then
+  if kconfig_y BRP_BUILD_OVERLAY; then
     message "Cleaning target dir for overlay"
     rm_unwanted "${target_dir}" "${unwanted[@]}"
     clean_empty "${target_dir}"
   fi
 
   local image_file
-  kconfig_get BR2_OVERLAY_IMAGES
-  for image in ${BR2_OVERLAY_IMAGES-}; do
+  kconfig_get BRP_OVERLAY_IMAGES
+  for image in ${BRP_OVERLAY_IMAGES-}; do
     image_file=$(get_image_file "${image}") || continue
     message "Extracting image ${image}"
     tar -x -f "${image_file}" -C "${target_dir}"
@@ -127,7 +127,7 @@ post_image() {
   message 'Copying images to board dir'
   copy_images "${image_dir}"
 
-  if kconfig_y BR2_BUILD_BOARD_IMAGE; then
+  if kconfig_y BRP_BUILD_BOARD_IMAGE; then
     if [[ -x "${BRP_BOARD_DIR}/build-image.sh" ]]; then
       message 'Building board image'
       (
