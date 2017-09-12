@@ -1,4 +1,4 @@
-config BR2_PACKAGE_NOMAD
+config CPI_PACKAGE_NOMAD
 	bool "Nomad cluster scheduler"
 	depends on BR2_PACKAGE_HOST_GO_ARCH_SUPPORTS
 	depends on BR2_PACKAGE_HOST_GO_CGO_LINKING_SUPPORTS
