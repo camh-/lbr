@@ -1,0 +1,2 @@
+BR2_DL_DIR="/data/download/buildroot"
+BR2_ENABLE_LOCALE_WHITELIST="C en_AU"
