@@ -69,3 +69,81 @@ kconfig_str_quote() {
 }
 
 #-------------------------------------------------------------------------------
+# kconfig_merge: Merge a list of defconfig fragments files into one defconfig
+# file. Settings in later fragments override earlier fragments.
+# The merged defconfig is written to stdout.
+kconfig_merge() {
+  declare -A config
+  declare -a order
+
+  # Read in the fragments
+  _merge config order "$@"
+
+  # Write out the merged config
+  for var in "${order[@]}"; do
+    printf '%s\n' "${config[${var}]}"
+  done
+}
+
+#-------------------------------------------------------------------------------
+# kconfig_demerge: Remove defconfig fragment from a defconfig file.
+# $1: A full defconfig file
+# $2..: defconfig fragments
+# The demerged config is written to stdout.
+kconfig_demerge() {
+  declare -A config
+  declare -a order
+  local defconfig="$1"; shift
+
+  _merge config order "$@"
+
+  while read -r var setting; do
+    if [[ "${config[${var}]-}" != "${setting}" ]]; then
+      printf '%s\n' "${setting}"
+    fi
+    unset config["${var}"]
+  done < <(_read_defconfig "${defconfig}")
+
+  # Any settings left unset from the fragments must have been reset back to
+  # defaults in the defconfig. Make sure we override the setting in the
+  # fragment by putting a "default" setting in the output.
+  for setting in "${!config[@]}"; do
+    printf '# %s is default\n' "${setting}"
+  done
+}
+
+#-------------------------------------------------------------------------------
+# Merge kconfig fragments into a pair of arrays.
+# $1: Name of associative array to hold config values keyed by setting name
+# $2: Name of indexed array to hold order of config values
+# $@: kconfig fragments
+_merge() {
+  declare -n _config="$1"; shift
+  declare -n _order="$1"; shift
+
+  for fragment; do
+    while read -r var setting; do
+      if [[ -z "${_config[${var}]-}" ]]; then
+        _order+=("${var}")
+      # else check if different and warn?
+      fi
+      _config["${var}"]="${setting}"
+    done < <(_read_defconfig "${fragment}")
+  done
+}
+
+#-------------------------------------------------------------------------------
+# Read a defconfig file outputting the variable name as the first field of
+# each line followed by the line from the kconfig file.
+# e.g.
+# "FOO=1" becomes "FOO FOO=1",
+# "# BAR is not set" becomes "BAR # BAR is not set".
+# "# BAR is default" is also parsed as a whiteout entry for a non-default value
+# in an earlier config fragment where the later fragment resets a value to the
+# default.
+_read_defconfig() {
+  local extract='s/^\(# \)\?\([A-Za-z0-9_]\+\)\(=.*\| is \(default\|not set\)\)$/\2 &/p'
+  sed -n "${extract}" "$1"
+}
+
+#-------------------------------------------------------------------------------
