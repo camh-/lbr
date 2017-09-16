@@ -5,6 +5,50 @@
 #
 # Functions here operate on the file in KCONFIG by default, unless a file is
 # specified.
+#
+#-----------------------------------------------------------------------------
+usage() {
+  printf 'Usage: %s {<options>...} <cmd>\n' "${0##*/}"
+  printf 'Available commands:\n'
+  printf '  merge <fragment>...\n'
+  printf '  demerge <defconfig> <fragment>...\n'
+  printf 'Available options:\n'
+}
+
+#-----------------------------------------------------------------------------
+main() {
+  parse_args "$@"
+  case "$1" in
+    merge)
+      kconfig_merge "${@:2}"
+      ;;
+    demerge)
+      kconfig_demerge "${@:2}"
+      ;;
+  esac
+}
+
+#-----------------------------------------------------------------------------
+parse_args() {
+  OPTSTRING=':'
+  while getopts "${OPTSTRING}" opt; do
+    case "${opt}" in
+      \?)
+        printf 'Invalid option: -%s\n\n' "${OPTARG}" >&2
+        usage >&2
+        exit 1
+        ;;
+      :)
+        printf 'Option -%s requires an argument\n\n' "${OPTARG}" >&2
+        usage >&2
+        exit 1
+        ;;
+    esac
+  done
+  shift $((OPTIND-1))
+
+  # Process remaining in "$@"
+}
 
 #-------------------------------------------------------------------------------
 # Get a config setting from a kconfig file. Option will be set as an environment
@@ -33,6 +77,8 @@ kconfig_y() {
 # $1: kconfig var
 # $2: string to append
 # $3: kconfig file (optional, default $KCONFIG)
+# Note: If the variable is not present in the kconfig file at all, no value
+# will be set.
 kconfig_str_set() {
   local qval=$(kconfig_str_quote "$2")  # quote for kconfig
   qval="${qval//\\/\\\\}"               # quote for sed
@@ -147,3 +193,4 @@ _read_defconfig() {
 }
 
 #-------------------------------------------------------------------------------
+[[ "$(caller)" != "0 "* ]] || main "$@"
