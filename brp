@@ -49,10 +49,6 @@ main()
 	# umask 0022  # fix buildroot bug, temporary
 	setup "$@" || exit 1
 
-	if ! known_target "${target}" ; then
-		echo "Unknown target: ${target}" >&2
-	fi
-	
 	if known_target "${target}" ; then
 		eval "target_${target}" "${phase}"
 	else
@@ -81,20 +77,6 @@ target_build()
 }
 
 # ----------------------------------------------------------------------------
-target_menuconfig()
-# ----------------------------------------------------------------------------
-{
-	make_config_target menuconfig "$1"
-}
-
-# ----------------------------------------------------------------------------
-target_oldconfig()
-# ----------------------------------------------------------------------------
-{
-	make_config_target oldconfig "$1"
-}
-
-# ----------------------------------------------------------------------------
 target_clean()
 # ----------------------------------------------------------------------------
 {
@@ -108,7 +90,14 @@ target_clean()
 target_unknown()
 # ----------------------------------------------------------------------------
 {
-	make_target "$1"
+	# All buildroot config targets end with config and do not contain a
+	# hyphen. Those with a hyphen configure buildroot packages and not
+	# buildroot itself so should be treated as a normal target.
+	if [[ "$1" =~ ^[^-]*config$ ]]; then
+		make_config_target "$1"
+	else
+		make_target "$1"
+	fi
 }
 
 # ============================================================================
