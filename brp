@@ -128,29 +128,28 @@ build()
 #   with BR2_DEFCONFIG pointing to the phase's config.
 # $1: (optional) Target to build. Defaults to "all".
 {
-	make_target "${1:-all}" 2>&1 | tee "${log_dir}/${phase}.log"
-	return "${PIPESTATUS[0]}"
-}
-
-# ----------------------------------------------------------------------------
-build_sdk()
-# TODO: Make this generically configurable in the config file (i.e. be able
-# to define a phase as "protect" or something.
-# ----------------------------------------------------------------------------
-{
-	# Give the user an option to bail out if we detect an already-
-	# installed sdk
-	# source the sdk buildroot config to get the install location
-	kconfig_get BR2_HOST_DIR "${BRP_BOARD_DIR}/config/sdk"
-	if [[ -d "${BR2_HOST_DIR}" && "${force}" -eq 0 ]] ; then
-		echo "SDK already exists in ${BR2_HOST_DIR}"
-		read -r -p "Proceed [y/N]? " result
+	# If the defconfig fragment has define BR2_HOST_DIR, we check
+	# if it exists and ask for confirmation to proceed if it does.
+	# This is to protect against mistakes which might overwrite
+	# an external toolchain.
+	kconfig_get BR2_HOST_DIR "${brpconfig}"
+	if [[ -n "${BR2_HOST_DIR-}" && -d "${BR2_HOST_DIR}" ]]; then
+		echo 'Host dir already exists:' "${BR2_HOST_DIR}"
+		read -r -p 'Proceed [y/N]? ' result
 		if [[ "${result}" != y && "${result}" != Y ]] ; then
 			echo "Aborting"
 			exit 0
 		fi
 	fi
 
+	make_target "${1:-all}" 2>&1 | tee "${log_dir}/${phase}.log"
+	return "${PIPESTATUS[0]}"
+}
+
+# ----------------------------------------------------------------------------
+build_sdk()
+# ----------------------------------------------------------------------------
+{
 	build sdk
 }
 
