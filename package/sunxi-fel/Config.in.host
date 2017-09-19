@@ -1,0 +1,9 @@
+config BR2_PACKAGE_HOST_SUNXI_FEL
+	bool "host sunxi-fel"
+	depends on BR2_arm
+	help
+	  Tools for Allwinner-based devices. This builds sunxi-fel
+	  to interface via USB with the FEL handler built into the
+	  Allwinner CPUs.
+
+	  http://linux-sunxi.org/Sunxi-tools
