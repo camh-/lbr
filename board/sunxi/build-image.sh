@@ -110,6 +110,10 @@ make_fel_image() {
     "${BRP_IMAGE_DIR}/${1}root/felboot.scr"
 
   run cp "$(locate "felboot")" "${BRP_IMAGE_DIR}"
+  if [[ -x "${HOST_DIR}/bin/sunxi-fel" ]]; then
+    run sed -i '/: ${HOST_DIR:=}/s|.*|: ${HOST_DIR:='"${HOST_DIR}"'}|' \
+      "${BRP_IMAGE_DIR}/felboot"
+  fi
 }
 
 #-----------------------------------------------------------------------------

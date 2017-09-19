@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# HOST_DIR defaults to empty so the search path is used. But it can be set
+# by an installer script to point to a specific version of sunxi-fel, or
+# it can be set in the environment which overrides this.
+: ${HOST_DIR:=}
+
+SUNXI_FEL=${HOST_DIR:+${HOST_DIR}/bin/}sunxi-fel
+
 if [[ -z "$1" ]] ; then
 	echo "defaulting to NFS boot"
 	set -- nfs
@@ -16,9 +23,9 @@ if [[ "$1" == 'rd' ]] ; then
 	extra_args+=(write 0x43300000 rootfs.cpio.uboot)
 fi
 
-sunxi-fel version || exit 1
+${SUNXI_FEL} version || exit 1
 
-sunxi-fel -v uboot u-boot-sunxi-with-spl.bin \
+${SUNXI_FEL} -v uboot u-boot-sunxi-with-spl.bin \
 	write 0x42000000 zImage \
 	write 0x43000000 board.dtb \
 	write 0x43100000 ${1}root/felboot.scr \
