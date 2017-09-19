@@ -124,8 +124,15 @@ post_fakeroot() {
 post_image() {
   local image_dir="$1"
 
+  # When building a board image, we copy the phase images into the board
+  # image directory without renaming them (i.e. without adding the phase
+  # name to the image). This gives these final board images a consistent
+  # name for the build-image script to work with.
+  local rename_arg
+  kconfig_y BRP_BUILD_BOARD_IMAGE && rename_arg='norename'
+
   message 'Copying images to board dir'
-  copy_images "${image_dir}"
+  copy_images "${image_dir}" "${rename_arg}"
 
   if kconfig_y BRP_BUILD_BOARD_IMAGE; then
     if [[ -x "${BRP_BOARD_DIR}/build-image.sh" ]]; then
@@ -202,7 +209,8 @@ copy_images() {
         continue
       fi
     fi
-    cp -a "${image}" "${BRP_IMAGE_DIR}/${image_name/rootfs/rootfs-${BRP_PHASE}}"
+    [[ "${2-}" != 'norename' ]] && image_name="${image_name/rootfs/rootfs-${BRP_PHASE}}"
+    cp -a "${image}" "${BRP_IMAGE_DIR}/${image_name}"
   done
 }
 
