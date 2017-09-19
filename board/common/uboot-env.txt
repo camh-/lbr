@@ -18,7 +18,9 @@ tftp_load_kernel=dhcp ${kernel_addr_r} ${kernelfile}; tftp ${fdt_addr_r} ${fdtfi
 fat_init=mmc dev 0
 fat_load_kernel=fatload mmc 0:1 ${kernel_addr_r} ${kernelfile}; fatload mmc 0:1 ${fdt_addr_r} ${fdtfile}
 
-nfs_args=setenv bootargs "${bootargs} ip=dhcp root=/dev/nfs nfsroot=10.100.110.1:${nfs_root}"
+nfs_opts=nfsvers=3
+
+nfs_args=setenv bootargs "${bootargs} ip=dhcp root=/dev/nfs nfsroot=10.100.110.1:${nfs_root},${nfs_opts}"
 mmc_args=setenv bootargs "${bootargs} root=/dev/mmcblk0p2"
 
 bootcmd=run boot
