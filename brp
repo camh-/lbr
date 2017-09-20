@@ -1,5 +1,7 @@
 #!/bin/bash
+# vim: set ts=8 sw=2 sts=2 et sta fileencoding=utf-8:
 #
+# -----------------------------------------------------------------------------
 # buildroot phased build script
 #
 # This script exists to orchestrate the multiple phases of buildroot that are
@@ -12,7 +14,7 @@
 script_dir=$(dirname $(realpath "$0"))
 source "${script_dir}/kconfig.sh"
 
-# ----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 MAKE=make
 
@@ -20,10 +22,8 @@ MAKE=make
 # Utility functions
 
 # ----------------------------------------------------------------------------
-usage()
-# ----------------------------------------------------------------------------
-{
-	cat <<EOF
+usage() {
+  cat <<EOF
 Usage: $program_name <target> [project] [board] <phase>
 Phases are defined with a <project>/board/<board>/config/<phase> defconfig file.
 A phase named "sdk" is handled specially in that you will be prompted
@@ -39,23 +39,21 @@ Targets are:
   clean: Remove the output directory for the phase.
   <other>: Other target are passed through to buildroot make.
 EOF
-	[[ -z "$1" ]] || exit "$1"
+[[ -z "$1" ]] || exit "$1"
 }
 
 # ----------------------------------------------------------------------------
-main()
-# ----------------------------------------------------------------------------
-{
-	# umask 0022  # fix buildroot bug, temporary
-	setup "$@" || exit 1
+main() {
+  # umask 0022  # fix buildroot bug, temporary
+  setup "$@" || exit 1
 
-	if known_target "${target}" ; then
-		eval "target_${target}" "${phase}"
-	else
-		target_unknown "${target}" "${phase}"
-	fi
+  if known_target "${target}" ; then
+    eval "target_${target}" "${phase}"
+  else
+    target_unknown "${target}" "${phase}"
+  fi
 
-	return 0
+  return 0
 }
 
 # ============================================================================
@@ -66,38 +64,32 @@ main()
 # target can be used
 
 # ----------------------------------------------------------------------------
-target_build()
-# ----------------------------------------------------------------------------
-{
-	if phase_has_build_function "${phase}" ; then
-		eval "build_${phase}"
-	else
-		build
-	fi
+target_build() {
+  if phase_has_build_function "${phase}" ; then
+    eval "build_${phase}"
+  else
+    build
+  fi
 }
 
 # ----------------------------------------------------------------------------
-target_clean()
-# ----------------------------------------------------------------------------
-{
-	if [[ -n "${BRP_OUTPUT_DIR}" ]] && [[ -n "${phase}" ]]; then
-		# shellcheck disable=SC2115
-		run rm -rf "${BRP_OUTPUT_DIR}/${phase}"
-	fi
+target_clean() {
+  if [[ -n "${BRP_OUTPUT_DIR}" ]] && [[ -n "${phase}" ]]; then
+    # shellcheck disable=SC2115
+    run rm -rf "${BRP_OUTPUT_DIR}/${phase}"
+  fi
 }
 
 # ----------------------------------------------------------------------------
-target_unknown()
-# ----------------------------------------------------------------------------
-{
-	# All buildroot config targets end with config and do not contain a
-	# hyphen. Those with a hyphen configure buildroot packages and not
-	# buildroot itself so should be treated as a normal target.
-	if [[ "$1" =~ ^[^-]*config$ ]]; then
-		make_config_target "$1"
-	else
-		make_target "$1"
-	fi
+target_unknown() {
+  # All buildroot config targets end with config and do not contain a
+  # hyphen. Those with a hyphen configure buildroot packages and not
+  # buildroot itself so should be treated as a normal target.
+  if [[ "$1" =~ ^[^-]*config$ ]]; then
+    make_config_target "$1"
+  else
+    make_target "$1"
+  fi
 }
 
 # ============================================================================
@@ -109,37 +101,33 @@ target_unknown()
 # function.
 
 # ----------------------------------------------------------------------------
-build()
-# ----------------------------------------------------------------------------
 # build
 # Build a phase into its own output directory, logging the process.
 # "make defconfig" is run first to set up the configuration for the phase,
 #   with BR2_DEFCONFIG pointing to the phase's config.
 # $1: (optional) Target to build. Defaults to "all".
-{
-	# If the defconfig fragment has define BR2_HOST_DIR, we check
-	# if it exists and ask for confirmation to proceed if it does.
-	# This is to protect against mistakes which might overwrite
-	# an external toolchain.
-	kconfig_get BR2_HOST_DIR "${brpconfig}"
-	if [[ -n "${BR2_HOST_DIR-}" && -d "${BR2_HOST_DIR}" ]]; then
-		echo 'Host dir already exists:' "${BR2_HOST_DIR}"
-		read -r -p 'Proceed [y/N]? ' result
-		if [[ "${result}" != y && "${result}" != Y ]] ; then
-			echo "Aborting"
-			exit 0
-		fi
-	fi
+build() {
+  # If the defconfig fragment has define BR2_HOST_DIR, we check
+  # if it exists and ask for confirmation to proceed if it does.
+  # This is to protect against mistakes which might overwrite
+  # an external toolchain.
+  kconfig_get BR2_HOST_DIR "${brpconfig}"
+  if [[ -n "${BR2_HOST_DIR-}" && -d "${BR2_HOST_DIR}" ]]; then
+    echo 'Host dir already exists:' "${BR2_HOST_DIR}"
+    read -r -p 'Proceed [y/N]? ' result
+    if [[ "${result}" != y && "${result}" != Y ]] ; then
+      echo "Aborting"
+      exit 0
+    fi
+  fi
 
-	make_target "${1:-all}" 2>&1 | tee "${log_dir}/${phase}.log"
-	return "${PIPESTATUS[0]}"
+  make_target "${1:-all}" 2>&1 | tee "${log_dir}/${phase}.log"
+  return "${PIPESTATUS[0]}"
 }
 
 # ----------------------------------------------------------------------------
-build_sdk()
-# ----------------------------------------------------------------------------
-{
-	build sdk
+build_sdk() {
+  build sdk
 }
 
 # ============================================================================
@@ -148,38 +136,32 @@ build_sdk()
 # menuconfig and oldconfig
 
 # ----------------------------------------------------------------------------
-make_config_target()
-# ----------------------------------------------------------------------------
 # make_config_target make_target
 # Run "make <make_target>" for <phase> and save the resulting minimal
 # defconfig in the configs directory.
 # If there is an existing minimal defconfig for <phase>, it will be used as
 # the basis of the menuconfig, otherwise a default config is used.
-{
-	make_target="$1"
+make_config_target() {
+  make_target="$1"
 
-	[[ -f "${brpconfig}" ]] || run touch "${brpconfig}"
+  [[ -f "${brpconfig}" ]] || run touch "${brpconfig}"
 
-	merge_config
-	run ${MAKE} "${make_args[@]}" defconfig "${make_target}" savedefconfig
-	demerge_config
+  merge_config
+  run ${MAKE} "${make_args[@]}" defconfig "${make_target}" savedefconfig
+  demerge_config
 }
 
-# ----------------------------------------------------------------------------
-merge_config()
 # ----------------------------------------------------------------------------
 # Merge the config fragments listed in the BRP_CONFIG_FRAGMENTS of the
 # current phases fragment file and write out a defconfig file to the
 # output directory (BR2_DEFCONFIG).
-{
-	kconfig_get BRP_CONFIG_FRAGMENTS "${brpconfig}"
-	local -a fragments
-	fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
-	kconfig_merge "${fragments[@]}" "${brpconfig}" > "${BR2_DEFCONFIG}"
+merge_config() {
+  kconfig_get BRP_CONFIG_FRAGMENTS "${brpconfig}"
+  local -a fragments
+  fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
+  kconfig_merge "${fragments[@]}" "${brpconfig}" > "${BR2_DEFCONFIG}"
 }
 
-# ----------------------------------------------------------------------------
-demerge_config()
 # ----------------------------------------------------------------------------
 # Subtract the fragments listed in the BRP_CONFIG_FRAGMENTS of the current
 # phases defconfig file (BR2_DEFCONFIG) from that defconfig file and write
@@ -190,26 +172,22 @@ demerge_config()
 # a non-default value in a fragment. Omitting the setting altogether in the
 # fragment would see the setting have the value from the fragment and not
 # the default value when the fragments are re-merged.
-{
-	kconfig_get BRP_CONFIG_FRAGMENTS "${BR2_DEFCONFIG}"
-	local -a fragments
-	fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
-	kconfig_demerge "${BR2_DEFCONFIG}" "${fragments[@]}" > "${brpconfig}"
+demerge_config() {
+  kconfig_get BRP_CONFIG_FRAGMENTS "${BR2_DEFCONFIG}"
+  local -a fragments
+  fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
+  kconfig_demerge "${BR2_DEFCONFIG}" "${fragments[@]}" > "${brpconfig}"
 }
 
-# ----------------------------------------------------------------------------
-find_fragments()
 # ----------------------------------------------------------------------------
 # find_fragments <fragment>...
 # Find each of the given fragments in the fragment search path.
-{
-	for fragment; do
-		find_fragment "${fragment}" || exit 1
-	done
+find_fragments() {
+  for fragment; do
+    find_fragment "${fragment}" || exit 1
+  done
 }
 
-# ----------------------------------------------------------------------------
-find_fragment()
 # ----------------------------------------------------------------------------
 # find_fragment <fragment>
 # $1: name of fragment file.
@@ -217,29 +195,27 @@ find_fragment()
 # board directory, and following the chain of parents back from the board
 # dir. Also look in the project directory and the core directory.
 # The search stops when the named fragment is found.
-{
-	local fragment="$1" dir
-	local -a parents cfg_dirs
-	get_parents parents "${BRP_BOARD_DIR}"
-	cfg_dirs=("${BRP_BOARD_DIR}" \
-		  "${parents[@]}" \
-		  "${BRP_PROJECT_DIR}" \
-		  "${BRP_CORE_DIR}"
-	)
-	for dir in "${cfg_dirs[@]}"; do
-		local f="${dir}/config/${fragment}"
-		if [[ -f "${f}" ]]; then
-			printf '%s\n' "${f}"
-			return 0
-		fi
-	done
+find_fragment() {
+  local fragment="$1" dir
+  local -a parents cfg_dirs
+  get_parents parents "${BRP_BOARD_DIR}"
+  cfg_dirs=("${BRP_BOARD_DIR}" \
+    "${parents[@]}" \
+    "${BRP_PROJECT_DIR}" \
+    "${BRP_CORE_DIR}"
+  )
+  for dir in "${cfg_dirs[@]}"; do
+    local f="${dir}/config/${fragment}"
+    if [[ -f "${f}" ]]; then
+      printf '%s\n' "${f}"
+      return 0
+    fi
+  done
 
-	printf 'Could not find defconfig fragment: %s\n' "${fragment}" >&2
-	return 1
+  printf 'Could not find defconfig fragment: %s\n' "${fragment}" >&2
+  return 1
 }
 
-# ----------------------------------------------------------------------------
-get_parents()
 # ----------------------------------------------------------------------------
 # get_parents <array_name> <board_dir>
 # Find all the parent directories of a board directory.
@@ -247,86 +223,74 @@ get_parents()
 # board dir until there are no more "parent" symlinks.
 # $1: Name of array to put the parent dirs in.
 # $2: The board directory to start from.
-{
-	local -n _parents="$1"
-	local dir="$2"
+get_parents() {
+  local -n _parents="$1"
+  local dir="$2"
 
-	while [[ -d "${dir}/parent" ]]; do
-		dir=$(realpath "${dir}/parent")
-		_parents+=("${dir}")
-	done
+  while [[ -d "${dir}/parent" ]]; do
+    dir=$(realpath "${dir}/parent")
+    _parents+=("${dir}")
+  done
 }
 
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-make_target()
-# ----------------------------------------------------------------------------
-{
-	make_target="$1"
+make_target() {
+  make_target="$1"
 
-	if [[ ! -f "${brpconfig}" ]] ; then
-		echo "No config for phase ${phase} at ${brpconfig}" >&2
-		return 1
-	fi
+  if [[ ! -f "${brpconfig}" ]] ; then
+    echo "No config for phase ${phase} at ${brpconfig}" >&2
+    return 1
+  fi
 
-	merge_config
-	run ${MAKE} "${make_args[@]}" defconfig \
-	&& post_config \
-	&& run ${MAKE} "${make_args[@]}" olddefconfig \
-	&& run ${MAKE} "${make_args[@]}" "${make_target}"
+  merge_config
+  run ${MAKE} "${make_args[@]}" defconfig \
+    && post_config \
+    && run ${MAKE} "${make_args[@]}" olddefconfig \
+    && run ${MAKE} "${make_args[@]}" "${make_target}"
 }
 
 # ----------------------------------------------------------------------------
-post_config()
-# ----------------------------------------------------------------------------
 # Run the post-config.sh script in each BR2_EXTERNAL dir. Set BR2_CONFIG
 # appropriately.
-{
-	IFS=: read -r -a ext_dirs <<<"${BR2_EXTERNAL}"
-	for dir in "${ext_dirs[@]}"; do (
-		if [[ -x "${dir}/post-config.sh" ]]; then
-			message post-config "${dir}"
-			BR2_CONFIG="${BRP_OUTPUT_DIR}/${BRP_PHASE}/.config"
-			export BR2_CONFIG
-			cd "${dir}"
-			run "${dir}/post-config.sh" "${dir}"
-		fi
-	) done
+post_config() {
+  IFS=: read -r -a ext_dirs <<<"${BR2_EXTERNAL}"
+  for dir in "${ext_dirs[@]}"; do (
+    if [[ -x "${dir}/post-config.sh" ]]; then
+      message post-config "${dir}"
+      BR2_CONFIG="${BRP_OUTPUT_DIR}/${BRP_PHASE}/.config"
+      export BR2_CONFIG
+      cd "${dir}"
+      run "${dir}/post-config.sh" "${dir}"
+    fi
+  ) done
 }
 
 # ============================================================================
 # UTILITY
 
 # ----------------------------------------------------------------------------
-phase_has_build_function()
-# ----------------------------------------------------------------------------
-{
-	[[ "$(type -t "build_${1}")" = function ]]
+phase_has_build_function() {
+  [[ "$(type -t "build_${1}")" = function ]]
 }
 
 # ----------------------------------------------------------------------------
-known_target()
-# ----------------------------------------------------------------------------
-{
-	[[ "$(type -t "target_${1}")" = function ]]
+known_target() {
+  [[ "$(type -t "target_${1}")" = function ]]
 }
 
 # ----------------------------------------------------------------------------
-run()
-# ----------------------------------------------------------------------------
-{
-	echo "$@"
-	[[ "${dryrun}" -ne 0 ]] || "$@"
+run() {
+  echo "$@"
+  [[ "${dryrun}" -ne 0 ]] || "$@"
 }
 
 # ----------------------------------------------------------------------------
-message()
-# ----------------------------------------------------------------------------
-{
-	tput smso
-	printf '>>> %s\n' "$*"
-	tput rmso
+message() {
+  tput smso
+  printf '>>> %s\n' "$*"
+  tput rmso
 }
 
 # ============================================================================
@@ -335,171 +299,157 @@ message()
 # this script depends on
 
 # ----------------------------------------------------------------------------
-setup()
-# ----------------------------------------------------------------------------
-{
-	program_name=${0##*/}
+setup() {
+  program_name=${0##*/}
 
-	BRP_ROOT=$(find_brp_root)
+  BRP_ROOT=$(find_brp_root)
 
-	parse_args "$@"
+  parse_args "$@"
 
-	load_config || return 1
+  load_config || return 1
 
-	BRP_CORE_DIR="${BRP_ROOT}/core"
-	BRP_PROJECT_DIR="${BRP_ROOT}/${project}"
-	BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
-	BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
-	BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
-	BRP_BOARD_DIR="${BRP_PROJECT_DIR}/board/${board}"
+  BRP_CORE_DIR="${BRP_ROOT}/core"
+  BRP_PROJECT_DIR="${BRP_ROOT}/${project}"
+  BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
+  BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
+  BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
+  BRP_BOARD_DIR="${BRP_PROJECT_DIR}/board/${board}"
 
-	BRP_PROJECT="${project}"
-	BRP_BOARD="${board}"
-	BRP_PHASE="${phase}"
+  BRP_PROJECT="${project}"
+  BRP_BOARD="${board}"
+  BRP_PHASE="${phase}"
 
-	find_buildroot
+  find_buildroot
 
-	check_config || return 1
+  check_config || return 1
 
-	brpconfig="${BRP_BOARD_DIR}/config/${phase}"
+  brpconfig="${BRP_BOARD_DIR}/config/${phase}"
 
-	log_dir="${BRP_OUTPUT_DIR}"/logs
+  log_dir="${BRP_OUTPUT_DIR}"/logs
 
-	export BR2_EXTERNAL="${BRP_CORE_DIR}:${BRP_PROJECT_DIR}"
-	export BR2_DEFCONFIG="${BRP_OUTPUT_DIR}/${phase}/defconfig"
-	make_args=(
-		-C "${buildroot}"
-		"O=${BRP_OUTPUT_DIR}/${phase}"
-	)
+  export BR2_EXTERNAL="${BRP_CORE_DIR}:${BRP_PROJECT_DIR}"
+  export BR2_DEFCONFIG="${BRP_OUTPUT_DIR}/${phase}/defconfig"
+  make_args=(
+    -C "${buildroot}"
+    "O=${BRP_OUTPUT_DIR}/${phase}"
+  )
 
-	[[ "$V" == '1' ]] && make_args+=("V=1")
+  [[ "$V" == '1' ]] && make_args+=("V=1")
 
-	force=0
-	dryrun=0
+  force=0
+  dryrun=0
 
-	make_output_dirs
+  make_output_dirs
 
-	export BRP_ROOT BRP_PROJECT_DIR BRP_OUTPUT_ROOT BRP_OUTPUT_DIR \
-		BRP_IMAGE_DIR BRP_BOARD_DIR BRP_PROJECT BRP_BOARD BRP_PHASE
+  export BRP_ROOT BRP_PROJECT_DIR BRP_OUTPUT_ROOT BRP_OUTPUT_DIR \
+    BRP_IMAGE_DIR BRP_BOARD_DIR BRP_PROJECT BRP_BOARD BRP_PHASE
 }
 
 # ----------------------------------------------------------------------------
-parse_args()
-# ----------------------------------------------------------------------------
-{
-	# Normal usage is:
-	#  brp <target> <project> <board> <config>
-	# but we can infer project and board from $PWD if appropriate.
-	# If we are in the project dir, then we don't require that arg.
-	# If we are in a projects board dir, we don't require those args.
-	# Use these CWD defaults if not explicitly given on the cmdline.
-	if [[ ${PWD} =~ ${BRP_ROOT}/([^/]*)(/board/([^/]*))? ]]; then
-		if [[ -n "${BASH_REMATCH[3]-}" ]]; then
-			board="${BASH_REMATCH[3]}"
-		fi
-		project="${BASH_REMATCH[1]}"
-	fi
+parse_args() {
+  # Normal usage is:
+  #  brp <target> <project> <board> <config>
+  # but we can infer project and board from $PWD if appropriate.
+  # If we are in the project dir, then we don't require that arg.
+  # If we are in a projects board dir, we don't require those args.
+  # Use these CWD defaults if not explicitly given on the cmdline.
+  if [[ ${PWD} =~ ${BRP_ROOT}/([^/]*)(/board/([^/]*))? ]]; then
+    if [[ -n "${BASH_REMATCH[3]-}" ]]; then
+      board="${BASH_REMATCH[3]}"
+    fi
+    project="${BASH_REMATCH[1]}"
+  fi
 
-	target="$1"; shift
-	(( $# == 3 )) && { project="$1"; shift; }
-	(( $# == 2 )) && { board="$1"; shift; }
-	phase="$1"
+  target="$1"; shift
+  (( $# == 3 )) && { project="$1"; shift; }
+  (( $# == 2 )) && { board="$1"; shift; }
+  phase="$1"
 
-	[[ -n "${project}" ]] || usage 1 >&2
-	[[ -n "${board}" ]] || usage 1 >&2
-	[[ -n "${phase}" ]] || usage 1 >&2
+  [[ -n "${project}" ]] || usage 1 >&2
+  [[ -n "${board}" ]] || usage 1 >&2
+  [[ -n "${phase}" ]] || usage 1 >&2
 }
 
 # ----------------------------------------------------------------------------
-find_brp_root()
-# ----------------------------------------------------------------------------
-{
-	# If we are inside a brp project dir, then use its parent as the
-	# brp root. Otherwise try to find it based on the path to $0 and
-	# failing that, $PWD.
-	# A brp project dir is also a BR2_EXTERNAL dir, which requires
-	# external.desc to exist. Use that to determine if we are in a brp
-	# project dir.
-	local prj_dir=$(realpath "${PWD}")
-	while [[ "${prj_dir}" ]] && ! [[ -f "${prj_dir}/external.desc" ]]; do
-		prj_dir="${prj_dir%/*}"
-	done
+find_brp_root() {
+  # If we are inside a brp project dir, then use its parent as the
+  # brp root. Otherwise try to find it based on the path to $0 and
+  # failing that, $PWD.
+  # A brp project dir is also a BR2_EXTERNAL dir, which requires
+  # external.desc to exist. Use that to determine if we are in a brp
+  # project dir.
+  local prj_dir=$(realpath "${PWD}")
+  while [[ "${prj_dir}" ]] && ! [[ -f "${prj_dir}/external.desc" ]]; do
+    prj_dir="${prj_dir%/*}"
+  done
 
-	if [[ "${prj_dir}" ]]; then
-		prog_dir="${prj_dir%/*}"
-	elif [[ "$0" =~ / ]]; then
-		prog_dir=$(dirname "$(realpath "$0")")
-	else
-		prog_dir=''
-	fi
+  if [[ "${prj_dir}" ]]; then
+    prog_dir="${prj_dir%/*}"
+  elif [[ "$0" =~ / ]]; then
+    prog_dir=$(dirname "$(realpath "$0")")
+  else
+    prog_dir=''
+  fi
 
-	printf '%s\n' "${prog_dir:-${PWD}}"
+  printf '%s\n' "${prog_dir:-${PWD}}"
 }
 
 # ----------------------------------------------------------------------------
-find_buildroot()
-# ----------------------------------------------------------------------------
-{
-	if [[ -z "${buildroot-}" ]]; then
-		if [[ -e "${BRP_PROJECT_DIR}/buildroot" ]]; then
-			buildroot="${BRP_PROJECT_DIR}/buildroot"
-		elif [[ -e "${BRP_ROOT}"/buildroot ]]; then
-			buildroot="${BRP_ROOT}/buildroot"
-		fi
-	fi
+find_buildroot() {
+  if [[ -z "${buildroot-}" ]]; then
+    if [[ -e "${BRP_PROJECT_DIR}/buildroot" ]]; then
+      buildroot="${BRP_PROJECT_DIR}/buildroot"
+    elif [[ -e "${BRP_ROOT}"/buildroot ]]; then
+      buildroot="${BRP_ROOT}/buildroot"
+    fi
+  fi
 }
 
 # ----------------------------------------------------------------------------
-load_config()
-# ----------------------------------------------------------------------------
-{
-	local -a xdg
-	IFS=: read -r -a xdg <<< "${XDG_CONFIG_DIRS:-/etc/xdg}"
-	local -a search=(
-		"${xdg[@]/%//brp}"
-		"${XDG_CONFIG_HOME:-$HOME/.config}/brp"
-		"${project}/brp.conf")
-	for path in "${search[@]}" ; do
-		if [[ -f "$path" ]] ; then
-			# shellcheck disable=SC1090
-			source "$path"
-		fi
-	done
+load_config() {
+  local -a xdg
+  IFS=: read -r -a xdg <<< "${XDG_CONFIG_DIRS:-/etc/xdg}"
+  local -a search=(
+  "${xdg[@]/%//brp}"
+  "${XDG_CONFIG_HOME:-$HOME/.config}/brp"
+  "${project}/brp.conf")
+  for path in "${search[@]}" ; do
+    if [[ -f "$path" ]] ; then
+      # shellcheck disable=SC1090
+      source "$path"
+    fi
+  done
 
-	return 0
+  return 0
 }
 
 # ----------------------------------------------------------------------------
-check_config()
-# ----------------------------------------------------------------------------
-{
-	if [[ -z "${buildroot}" ]] ; then
-		echo "'buildroot' not set in config. Where is buildroot?" >&2
-		return 1
-	fi
-	if ! [[ -d "${BRP_BOARD_DIR}" ]] ; then
-		echo "board dir missing: ${BRP_BOARD_DIR}" >&2
-		return 1
-	fi
-	return 0
+check_config() {
+  if [[ -z "${buildroot}" ]] ; then
+    echo "'buildroot' not set in config. Where is buildroot?" >&2
+    return 1
+  fi
+  if ! [[ -d "${BRP_BOARD_DIR}" ]] ; then
+    echo "board dir missing: ${BRP_BOARD_DIR}" >&2
+    return 1
+  fi
+  return 0
 }
 
 # ----------------------------------------------------------------------------
-make_output_dirs()
-# ----------------------------------------------------------------------------
-{
-	for dir in "${BRP_OUTPUT_DIR}" "${BRP_IMAGE_DIR}" "${log_dir}" \
-		"${BRP_OUTPUT_DIR}/${phase}"; do
-		if [[ ! -d "${dir}" ]]; then
-			if [[ ! -e "${dir}" ]]; then
-				run mkdir -p "${dir}"
-			else
-				echo "Cannot mkdir ${dir}" >&2
-				exit 1
-			fi
-		fi
-	done
+make_output_dirs() {
+  for dir in "${BRP_OUTPUT_DIR}" "${BRP_IMAGE_DIR}" "${log_dir}" \
+    "${BRP_OUTPUT_DIR}/${phase}"; do
+  if [[ ! -d "${dir}" ]]; then
+    if [[ ! -e "${dir}" ]]; then
+      run mkdir -p "${dir}"
+    else
+      echo "Cannot mkdir ${dir}" >&2
+      exit 1
+    fi
+  fi
+done
 }
 
 # ----------------------------------------------------------------------------
-[[ "$(caller)" != "0 "* ]] || main "$@"
+[[ "$(caller)" == 0\ * ]] && main "$@"
