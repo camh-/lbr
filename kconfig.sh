@@ -73,6 +73,18 @@ kconfig_y() {
 }
 
 #-------------------------------------------------------------------------------
+# kconfig_val_set <kconfig_var> <value> <kconfig_file>?
+# Set <kconfig_var> to <value> in <kconfig_file>. This should not be used for
+# string values - use kconfig_str_set or kconfig_str_append instead. The value
+# should be appropriate for the kconfig_var type. No validation is done.
+kconfig_val_set() {
+  sed -i \
+    -e 's|^\('"$1"'\)=.*|\1='"$2"'|' \
+    -e 's|^# \('"$1"'\) is not set|\1='"$2"'|' \
+    "${3:-${KCONFIG}}"
+}
+
+#-------------------------------------------------------------------------------
 # set a string value in the kconfig file.
 # $1: kconfig var
 # $2: string to append
@@ -82,10 +94,7 @@ kconfig_y() {
 kconfig_str_set() {
   local qval=$(kconfig_str_quote "$2")  # quote for kconfig
   qval="${qval//\\/\\\\}"               # quote for sed
-  sed -i \
-    -e 's|^\('"$1"'\)=".*"|\1="'"${qval}"'"|' \
-    -e 's|^# \('"$1"'\) is not set|\1="'"${qval}"'"|' \
-    "${3:-${KCONFIG}}"
+  kconfig_val_set "$1" "\"${qval}\"" "$3"
 }
 
 #-------------------------------------------------------------------------------
