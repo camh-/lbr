@@ -38,6 +38,8 @@ Targets are:
   oldconfig: Run make oldconfig on the target, saving the minimal defconfig
     back in the configs directory.
   clean: Remove the output directory for the phase.
+  linuxup: Update the linux kernel config for the next available version
+    of linux.
   <other>: Other target are passed through to buildroot make.
 EOF
 [[ -z "$1" ]] || exit "$1"
@@ -79,6 +81,41 @@ target_clean() {
     # shellcheck disable=SC2115
     run rm -rf "${BRP_OUTPUT_DIR}/${phase}"
   fi
+}
+
+# ----------------------------------------------------------------------------
+# linuxup: Update the linux config to the next available version.
+# The phase must have a linux build in the br2 config.
+#
+# Linux kernel upgrading works like this:
+# Look in the current br2 merged defconfig:
+# * You must be using a custom git repo (BR2_LINUX_KERNEL_CUSTOM_GIT=y)
+# * Get the current version (BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION)
+# * Get the latest point release of next minor version from repo
+# * Get the custom config file (BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE)
+#   + Extract directory from custom config file
+#   + Make new sibling directory with major.minor of next kernel version
+#   + Copy files from old dir to new dir
+# * Do the same for fragment files (BR2_LINUX_KERNEL_CUSTOM_FRAGMENT_FILES)
+# * Change br2 merged defconfig to update version, config and fragments.
+# * Generate full br2 config from merged defconfig
+# * Extract kernel version (linux-patch?)
+# * Copy config from config file dir to linux build dir
+# * Run oldconfig on the kernel
+# * Run make linux-config-demerge
+target_linuxup() {
+  get_linux_br2_config
+  local current_tag current_version next_tag next_version
+  current_tag="${BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION}"
+  current_version=$(extract_major_minor "${current_tag}")
+  next_tag=$(next_linux_version "${BR2_LINUX_KERNEL_CUSTOM_REPO_URL}" "${current_tag}")
+  next_version=$(extract_major_minor "${next_tag}")
+
+  kconfig_str_set BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION "${next_tag}" "${brpconfig}"
+  uplift_linux_configs "${current_version}" "${next_version}"
+
+  make_target linux-configure
+  make_target linux-config-demerge
 }
 
 # ----------------------------------------------------------------------------
@@ -269,6 +306,111 @@ post_config() {
       cd "${dir}" && run "${dir}/post-config.sh" "${dir}"
     fi
   ) done
+}
+
+# ============================================================================
+# Linux kernel config upgrading
+#
+# ----------------------------------------------------------------------------
+get_linux_br2_config() {
+  if ! kconfig_y BR2_LINUX_KERNEL "${brpconfig}"; then
+    printf 'Linux kernel build not enabled in this phase\n' >&2
+    exit 1
+  fi
+
+  if ! kconfig_y BR2_LINUX_KERNEL_CUSTOM_GIT "${brpconfig}"; then
+    printf 'You need to be using a custom git repository\n' >&2
+    exit 1
+  fi
+
+  if ! kconfig_y BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG "${brpconfig}"; then
+    printf 'You need to be using a custom config to update it\n' >&2
+    exit 1
+  fi
+
+  kconfig_get BR2_LINUX_KERNEL_CUSTOM_REPO_URL "${brpconfig}"
+  kconfig_get BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION "${brpconfig}"
+  kconfig_get BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE "${brpconfig}"
+  kconfig_get BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES "${brpconfig}"
+}
+
+# ----------------------------------------------------------------------------
+# next_linux_version <git_repository> <current_version>
+# Find the next linux version from <git_repository> after <current_version>
+# that is a linux git version tag. Output the full version tag.
+# If there is no next minor version, the latest point release version for the
+# current minor version is output.
+# Returns true if a version was found, false if not.
+next_linux_version() {
+  # shellcheck disable=SC2016
+  # We don't want to expand vars, but shellcheck thinks we do.
+  find_next='
+    $1"."$2 == last {if (vers) {print vers} else {print $0}; found=1; exit}
+    $1"."$2 != seen {seen=$1"."$2; vers=$0}
+    END {if (found) {exit 0}; exit 1}
+  '
+  local version
+  if version=$(extract_major_minor "$2"); then
+    git ls-remote --tags "$1" \
+      | awk -F/ '/(\^\{\}$|-)/ {next} {print $3}' \
+      | sort -Vr \
+      | awk -F. -v last="v${version}" "${find_next}"
+  else
+    return 1
+  fi
+}
+
+# ----------------------------------------------------------------------------
+# extract_major_minor <version_tag>
+# Extract the major.minor version from a linux version tag and output to
+# stdout. Returns true if the version could be extracted, false if not.
+extract_major_minor() {
+  if ! [[ "$1" =~ v([0-9]+\.[0-9]+)\. ]]; then
+    printf 'Cannot find v<major>.<minor> in kernel version %s\n' "$1" >&2
+    return 1
+  fi
+  echo "${BASH_REMATCH[1]}"
+  return 0
+}
+
+# ----------------------------------------------------------------------------
+# uplift_linux_configs <current_version> <next_version>
+# Uplift the linux config file and the linux config fragments from
+# <current_version> to <next_version> and update the br2 phase defconfig
+# fragment with the uplifted paths.
+uplift_linux_configs() {
+  local cur="$1" next="$2"
+
+  # Uplift the config file.
+  local new_config
+  new_config=$(uplift_linux_config "${cur}" "${next}" "${BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE}")
+  kconfig_str_set BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE "${new_config}" "${brpconfig}"
+
+  # Uplift each config file fragment.
+  local fragment
+  local -a linux_fragments
+  for fragment in ${BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES}; do
+    linux_fragments+=( "$(uplift_linux_config "${cur}" "${next}" "${fragment}")" )
+  done
+  kconfig_str_set BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES "${linux_fragments[*]}" "${brpconfig}"
+}
+
+# ----------------------------------------------------------------------------
+# uplift_linux_config <current_version> <next_version> <config_val>
+# If <config_val> is in a directory named <current_version>, copy the file
+# to a new directory named <next_version> and output the path to the new
+# config file. Otherwise just echo the name of the config_file.
+# Note, we need to expand $ refs in the config file name so we can copy the
+# config file, but we output the uplifted setting value without performing
+# the expansion.
+uplift_linux_config() {
+  local current_version="$1" next_version="$2" config_val="$3"
+  if [[ "${config_val}" =~ ^(.*)/"${current_version}"/(.*)$ ]]; then
+    local new_dir="${BASH_REMATCH[1]}/${next_version}"
+    config_val="${new_dir}/${BASH_REMATCH[2]}"
+    install -D "$(envsubst <<<"$3")" "$(envsubst <<<"${config_val}")"
+  fi
+  echo "${config_val}"
 }
 
 # ============================================================================
