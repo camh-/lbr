@@ -11,4 +11,5 @@ else
 linux-config-demerge: linux-savedefconfig
 	$(BRP_ROOT)/kconfig.sh demerge $(LINUX_DIR)/defconfig \
 		$(LINUX_KCONFIG_FRAGMENT_FILES) > $(LINUX_KCONFIG_FILE)
+	cp $(LINUX_DIR)/.config $(dir $(LINUX_KCONFIG_FILE))/config
 endif
