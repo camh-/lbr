@@ -11,7 +11,8 @@
 
 # =============================================================================
 
-script_dir=$(dirname $(realpath "$0"))
+script_dir=$(dirname "$(realpath "$0")")
+# shellcheck source=/dev/null
 source "${script_dir}/kconfig.sh"
 
 # -----------------------------------------------------------------------------
@@ -158,6 +159,8 @@ make_config_target() {
 merge_config() {
   kconfig_get BRP_CONFIG_FRAGMENTS "${brpconfig}"
   local -a fragments
+  # shellcheck disable=SC2086
+  # We want to split on spaces for BRP_CONFIG_FRAGMENTS
   fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
   kconfig_merge "${fragments[@]}" "${brpconfig}" > "${BR2_DEFCONFIG}"
 }
@@ -175,6 +178,8 @@ merge_config() {
 demerge_config() {
   kconfig_get BRP_CONFIG_FRAGMENTS "${BR2_DEFCONFIG}"
   local -a fragments
+  # shellcheck disable=SC2086
+  # We want to split on spaces for BRP_CONFIG_FRAGMENTS
   fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
   kconfig_demerge "${BR2_DEFCONFIG}" "${fragments[@]}" > "${brpconfig}"
 }
@@ -261,8 +266,7 @@ post_config() {
       message post-config "${dir}"
       BR2_CONFIG="${BRP_OUTPUT_DIR}/${BRP_PHASE}/.config"
       export BR2_CONFIG
-      cd "${dir}"
-      run "${dir}/post-config.sh" "${dir}"
+      cd "${dir}" && run "${dir}/post-config.sh" "${dir}"
     fi
   ) done
 }
@@ -336,7 +340,6 @@ setup() {
 
   [[ "$V" == '1' ]] && make_args+=("V=1")
 
-  force=0
   dryrun=0
 
   make_output_dirs
@@ -378,7 +381,8 @@ find_brp_root() {
   # A brp project dir is also a BR2_EXTERNAL dir, which requires
   # external.desc to exist. Use that to determine if we are in a brp
   # project dir.
-  local prj_dir=$(realpath "${PWD}")
+  local prj_dir
+  prj_dir=$(realpath "${PWD}")
   while [[ "${prj_dir}" ]] && ! [[ -f "${prj_dir}/external.desc" ]]; do
     prj_dir="${prj_dir%/*}"
   done
