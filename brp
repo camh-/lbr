@@ -21,10 +21,11 @@ MAKE=make
 
 declare -A OPTIONS=(
   [global]='h'
-  [linuxup]='g'
+  [linuxup]='go'
 )
 
 OPT_linuxup_git=false
+OPT_linuxup_oldconfig=false
 
 # ----------------------------------------------------------------------------
 usage() {
@@ -118,7 +119,14 @@ target_linuxup() {
   dotconfig=$(uplift_linux_configs "${current_version}" "${next_version}")
 
   local config_target=linux-configure
-  [[ -n "${dotconfig}" ]] && config_target=linux-oldconfig
+  if "${OPT_linuxup_oldconfig}"; then
+    if [[ -n "${dotconfig}" ]]; then
+      config_target=linux-oldconfig
+    else
+      printf 'No dot config file available for oldconfig\n' >&1
+      exit 1
+    fi
+  fi
   make_target "${config_target}"
   make_target linux-config-demerge
 }
@@ -575,6 +583,9 @@ handle_linuxup_option() {
   case "$1" in
     g)
       OPT_linuxup_git=true
+      ;;
+    o)
+      OPT_linuxup_oldconfig=true
       ;;
   esac
 }
