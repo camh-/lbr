@@ -112,9 +112,12 @@ target_linuxup() {
   next_version=$(extract_major_minor "${next_tag}")
 
   kconfig_str_set BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION "${next_tag}" "${brpconfig}"
-  uplift_linux_configs "${current_version}" "${next_version}"
+  local dotconfig
+  dotconfig=$(uplift_linux_configs "${current_version}" "${next_version}")
 
-  make_target linux-configure
+  local config_target=linux-configure
+  [[ -n "${dotconfig}" ]] && config_target=linux-oldconfig
+  make_target "${config_target}"
   make_target linux-config-demerge
 }
 
@@ -381,10 +384,19 @@ extract_major_minor() {
 uplift_linux_configs() {
   local cur="$1" next="$2"
 
-  # Uplift the config file.
+  # Uplift the (def)config file.
   local new_config
   new_config=$(uplift_linux_config "${cur}" "${next}" "${BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE}")
   kconfig_str_set BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE "${new_config}" "${brpconfig}"
+
+  # Uplift the config file if it exists and was not uplifted before.
+  if ! [[ "${BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE}" =~ /"${cur}"/config$ ]]; then
+    local dotconfig="${BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE%/*}/config"
+    if [[ -f "$(envsubst <<<"${dotconfig}")" ]]; then
+      # Leave the output of uplift_linux_config to echo back to the caller of us.
+      uplift_linux_config "${cur}" "${next}" "${dotconfig}"
+    fi
+  fi
 
   # Uplift each config file fragment.
   local fragment

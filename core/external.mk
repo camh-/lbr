@@ -5,6 +5,19 @@ ifneq (,$(BRP_BUILD_OVERLAY))
 $(BUILD_DIR)/toolchain-external-custom/.stamp_target_installed: ;
 endif
 
+.PHONY: linux-oldconfig
+linux-oldconfig: linux-config-dotconfig
+	$(LINUX_CONFIGURATOR_MAKE_ENV) $(MAKE) -C $(LINUX_DIR) \
+		$(LINUX_KCONFIG_OPTS) oldconfig
+
+.PHONY: linux-config-dotconfig
+linux-config-dotconfig: linux-configure
+	cp $(dir $(LINUX_KCONFIG_FILE))/config $(LINUX_DIR)/.config
+
+# Define a rule for updating a linux kernel defconfig in the presence of
+# config fragments. Buildroot errors out with this, but we have a kconfig
+# demerge script we can use to make this work.
+.PHONY: linux-config-demerge
 ifeq (,$(LINUX_KCONFIG_FRAGMENT_FILES))
 linux-config-demerge: linux-update-defconfig
 else
