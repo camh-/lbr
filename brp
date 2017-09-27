@@ -19,9 +19,12 @@ source "${script_dir}/kconfig.sh"
 
 MAKE=make
 
-OPTIONS=(
+declare -A OPTIONS=(
   [global]='h'
+  [linuxup]='g'
 )
+
+OPT_linuxup_git=false
 
 # ----------------------------------------------------------------------------
 usage() {
@@ -38,6 +41,7 @@ Targets are:
   *config: Run make *config on the target, saving the minimal phase defconfig.
   clean:   Remove the output directory for the phase.
   linuxup: Update the linux kernel config to the next version of linux.
+    -g:      Add new config files to git before savedefconfig.
   <other>: Other target are passed through to buildroot make.
 EOF
 [[ -z "$1" ]] || exit "$1"
@@ -419,6 +423,9 @@ uplift_linux_config() {
     local new_dir="${BASH_REMATCH[1]}/${next_version}"
     config_val="${new_dir}/${BASH_REMATCH[2]}"
     install -D "$(envsubst <<<"$3")" "$(envsubst <<<"${config_val}")"
+    if "${OPT_linuxup_git}"; then
+      git add "$(envsubst <<<"${config_val}")"
+    fi
   fi
   echo "${config_val}"
 }
@@ -559,6 +566,15 @@ handle_global_option() {
   case "$1" in
     h)
       usage 0
+      ;;
+  esac
+}
+
+# ----------------------------------------------------------------------------
+handle_linuxup_option() {
+  case "$1" in
+    g)
+      OPT_linuxup_git=true
       ;;
   esac
 }
