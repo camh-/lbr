@@ -61,10 +61,14 @@ make_uboot_env_image() {
     echo "Not making ${1} uboot env image. Missing: $missing"
     return
   fi
-  mkdir -p "${BRP_IMAGE_DIR}/${1}"
-  cat "${uenv_req[@]}" "${env}" \
-    | run mkenvimage -s 0x20000 -o "${BRP_IMAGE_DIR}/${1}/uboot-env.bin" -
-  echo '#=uEnv' | cat - "${uenv_req[@]}" "${env}" > "${BRP_IMAGE_DIR}/${1}/uboot.env"
+
+  local bootdir="${BRP_IMAGE_DIR}/$1"
+  local txtenv="${bootdir}/uboot-env.txt"
+  local binenv="${bootdir}/uboot-env.bin"
+
+  mkdir -p "${bootdir}"
+  echo '#=uEnv' | cat - "${uenv_req[@]}" "${env}" > "${txtenv}"
+  run mkenvimage -s 0x20000 -o "${binenv}" "${txtenv}"
 }
 
 make_sdcard_image() {

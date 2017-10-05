@@ -28,5 +28,5 @@ ${SUNXI_FEL} version || exit 1
 ${SUNXI_FEL} -v uboot u-boot-sunxi-with-spl.bin \
 	write 0x42000000 zImage \
 	write 0x43000000 board.dtb \
-	write 0x43100000 ${1}/uboot.env \
+	write 0x43100000 ${1}/uboot-env.txt \
 	"${extra_args[@]}"
