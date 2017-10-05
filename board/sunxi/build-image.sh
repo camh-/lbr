@@ -34,8 +34,8 @@ init() {
 main() {
   init
   link_dtb "$@"
-  make_images sd nfs
-  make_fel_image rd
+  make_images sdroot nfsroot
+  make_fel_image rdroot
 }
 
 link_dtb() {
@@ -56,25 +56,25 @@ make_images() {
 
 make_uboot_env_image() {
   local env
-  env="$(locate "${1}root/uboot-env.txt")"
+  env="$(locate "${1}/uboot-env.txt")"
   if ! missing=$(req "${uenv_req[@]}" "${env}"); then
     echo "Not making ${1} uboot env image. Missing: $missing"
     return
   fi
-  mkdir -p "${BRP_IMAGE_DIR}/${1}root"
+  mkdir -p "${BRP_IMAGE_DIR}/${1}"
   cat "${uenv_req[@]}" "${env}" \
-    | run mkenvimage -s 0x20000 -o "${BRP_IMAGE_DIR}/${1}root/uboot-env.bin" -
+    | run mkenvimage -s 0x20000 -o "${BRP_IMAGE_DIR}/${1}/uboot-env.bin" -
 }
 
 make_sdcard_image() {
-  local v="sdcard_${1}root_req[@]"
+  local v="sdcard_${1}_req[@]"
   if ! missing=$(req "${sdcard_req[@]}" "${!v}"); then
     echo "Not making ${1} SD card image. Missing: $missing"
     return
   fi
 
   local GENIMAGE_CFG GENIMAGE_TMP ROOTPATH_TMP
-  GENIMAGE_CFG=$(locate "${1}root/genimage.cfg")
+  GENIMAGE_CFG=$(locate "${1}/genimage.cfg")
   GENIMAGE_TMP=$(mktemp -d "${BRP_IMAGE_DIR}/genimage.XXXXXXXXX")
   ROOTPATH_TMP=$(mktemp -d -t "genimage.root.XXXXXXXXX")
 
@@ -82,12 +82,12 @@ make_sdcard_image() {
 
   trap cleanup EXIT
 
-  mkdir -p "${BRP_IMAGE_DIR}/${1}root"
+  mkdir -p "${BRP_IMAGE_DIR}/${1}"
   run genimage \
     --rootpath "${ROOTPATH_TMP}" \
     --tmppath "${GENIMAGE_TMP}" \
     --inputpath "${BRP_IMAGE_DIR}" \
-    --outputpath "${BRP_IMAGE_DIR}/${1}root" \
+    --outputpath "${BRP_IMAGE_DIR}/${1}" \
     --config "${GENIMAGE_CFG}"
 
   cleanup
@@ -95,19 +95,19 @@ make_sdcard_image() {
 }
 
 make_fel_image() {
-  if ! felboot_cmd=$(locate "${1}root/felboot.cmd"); then
-    echo "Not making $1 FEL image. Missing: ${1}root/felboot.cmd"
+  if ! felboot_cmd=$(locate "${1}/felboot.cmd"); then
+    echo "Not making $1 FEL image. Missing: ${1}/felboot.cmd"
     return
   fi
 
   # Create a boot script image for FEL booting the board. Also copy a
   # felboot script into the image directory that makes it easy to FEL
   # boot the generated images
-  mkdir -p "${BRP_IMAGE_DIR}/${1}root"
+  mkdir -p "${BRP_IMAGE_DIR}/${1}"
   run mkimage \
     -C none -A arm -T script \
     -d "${felboot_cmd}" \
-    "${BRP_IMAGE_DIR}/${1}root/felboot.scr"
+    "${BRP_IMAGE_DIR}/${1}/felboot.scr"
 
   run cp "$(locate "felboot")" "${BRP_IMAGE_DIR}"
   if [[ -x "${HOST_DIR}/bin/sunxi-fel" ]]; then

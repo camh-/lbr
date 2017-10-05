@@ -8,18 +8,18 @@
 SUNXI_FEL=${HOST_DIR:+${HOST_DIR}/bin/}sunxi-fel
 
 if [[ -z "$1" ]] ; then
-	echo "defaulting to NFS boot"
-	set -- nfs
+	echo "defaulting to NFS root"
+	set -- nfsroot
 fi
 
-if [[ ! -d "${1}root" ]] ; then
-	echo "No directory ${1}root"
+if [[ ! -d "${1}" ]] ; then
+	echo "No directory ${1}"
 	exit 1
 fi
 
 extra_args=()
 
-if [[ "$1" == 'rd' ]] ; then
+if [[ "$1" == 'rdroot' ]] ; then
 	extra_args+=(write 0x43300000 rootfs.cpio.uboot)
 fi
 
@@ -28,5 +28,5 @@ ${SUNXI_FEL} version || exit 1
 ${SUNXI_FEL} -v uboot u-boot-sunxi-with-spl.bin \
 	write 0x42000000 zImage \
 	write 0x43000000 board.dtb \
-	write 0x43100000 ${1}root/felboot.scr \
+	write 0x43100000 ${1}/felboot.scr \
 	"${extra_args[@]}"
