@@ -35,7 +35,8 @@ main() {
   init
   link_dtb "$@"
   make_images sdroot nfsroot
-  make_fel_image rdroot
+  make_uboot_env_image rdroot
+  copy_felboot
 }
 
 link_dtb() {
@@ -50,7 +51,6 @@ make_images() {
   for image; do
     make_uboot_env_image "${image}"
     make_sdcard_image "${image}"
-    make_fel_image "${image}"
   done
 }
 
@@ -64,6 +64,7 @@ make_uboot_env_image() {
   mkdir -p "${BRP_IMAGE_DIR}/${1}"
   cat "${uenv_req[@]}" "${env}" \
     | run mkenvimage -s 0x20000 -o "${BRP_IMAGE_DIR}/${1}/uboot-env.bin" -
+  echo '#=uEnv' | cat - "${uenv_req[@]}" "${env}" > "${BRP_IMAGE_DIR}/${1}/uboot.env"
 }
 
 make_sdcard_image() {
@@ -94,21 +95,7 @@ make_sdcard_image() {
   trap - EXIT
 }
 
-make_fel_image() {
-  if ! felboot_cmd=$(locate "${1}/felboot.cmd"); then
-    echo "Not making $1 FEL image. Missing: ${1}/felboot.cmd"
-    return
-  fi
-
-  # Create a boot script image for FEL booting the board. Also copy a
-  # felboot script into the image directory that makes it easy to FEL
-  # boot the generated images
-  mkdir -p "${BRP_IMAGE_DIR}/${1}"
-  run mkimage \
-    -C none -A arm -T script \
-    -d "${felboot_cmd}" \
-    "${BRP_IMAGE_DIR}/${1}/felboot.scr"
-
+copy_felboot() {
   run cp "$(locate "felboot")" "${BRP_IMAGE_DIR}"
   if [[ -x "${HOST_DIR}/bin/sunxi-fel" ]]; then
     run sed -i '/: ${HOST_DIR:=}/s|.*|: ${HOST_DIR:='"${HOST_DIR}"'}|' \
