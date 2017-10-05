@@ -5,6 +5,8 @@ roottype=mmc
 
 kernelfile=zImage
 fdtfile=board.dtb
+nfs_root_path=/srv/nfs/root/clusterpi
+nfs_root_dir=root
 
 init=/sbin/init
 console=ttyS0
@@ -20,7 +22,7 @@ fat_load_kernel=fatload mmc 0:1 ${kernel_addr_r} ${kernelfile}; fatload mmc 0:1 
 
 nfs_opts=nfsvers=3
 
-nfs_args=setenv bootargs "${bootargs} ip=dhcp root=/dev/nfs nfsroot=10.100.110.1:${nfs_root},${nfs_opts}"
+nfs_args=setenv bootargs "${bootargs} ip=dhcp root=/dev/nfs nfsroot=10.100.110.1:${nfs_root_path}/${nfs_root_dir},${nfs_opts}"
 mmc_args=setenv bootargs "${bootargs} root=/dev/mmcblk0p2"
 
 # Generic boot starts here.
