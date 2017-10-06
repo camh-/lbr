@@ -1,3 +1,4 @@
+autoload=0
 bootdelay=1
 
 bootmode=fat
@@ -23,8 +24,14 @@ fat_load_kernel=fatload mmc 0:1 ${kernel_addr_r} ${kernelfile}; fatload mmc 0:1 
 
 nfs_opts=nfsvers=3
 
-nfs_args=setenv bootargs "${bootargs} ip=dhcp root=/dev/nfs nfsroot=${serverip}:${nfs_root_path}/${nfs_root_dir},${nfs_opts}"
+nfs_args=run get_netboot_args; setenv bootargs "${bootargs} ip=dhcp root=/dev/nfs nfsroot=${serverip}:${nfs_root_path}/${nfs_root_dir},${nfs_opts}"
 mmc_args=setenv bootargs "${bootargs} root=/dev/mmcblk0p2"
+
+dhcp_done=false
+dhcp_init=if ${dhcp_done}; then true; else setenv dhcp_done true; dhcp; fi
+
+get_netboot_args=run dhcp_init set_nfs_from_hostname
+set_nfs_from_hostname=if test -n "${hostname}"; then setenv nfs_root_dir ${hostname}; else; true; fi
 
 # Generic boot starts here.
 bootcmd=run boot
