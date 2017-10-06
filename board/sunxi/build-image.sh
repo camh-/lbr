@@ -34,7 +34,7 @@ init() {
 main() {
   init
   link_dtb "$@"
-  make_images sdroot nfsroot
+  make_images sdroot nfsroot uboot
   make_uboot_env_image rdroot
   copy_felboot
 }

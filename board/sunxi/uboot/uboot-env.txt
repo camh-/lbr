@@ -1,0 +1,2 @@
+bootcmd=echo Dropping to prompt
+bootdelay=0
