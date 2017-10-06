@@ -200,16 +200,19 @@ copy_images() {
     local image_name="${image##*/}"
     # don't copy an uncompressed rootfs if there's a compressed one.
     if [[ "${image_name}" =~ ^rootfs\.[^.]*$ ]] && globmatch "${image}.*"; then
+      printf '%s: skipping uncompressed image\n' "${image_name}"
       continue
     fi
     # don't copy an empty image tar file
     if [[ "${image_name}" =~ ^rootfs\.tar* ]]; then
       if [[ "$(tar -t -f "${image}")" == './' ]]; then
-        printf 'Not copying empty image %s\n' "${image_name}"
+        printf '%s: skipping empty image\n' "${image_name}"
         continue
       fi
     fi
+    printf '%s: copying as ' "${image_name}"
     [[ "${2-}" != 'norename' ]] && image_name="${image_name/rootfs/rootfs-${BRP_PHASE}}"
+    printf '%s\n' "${image_name}"
     cp -a "${image}" "${BRP_IMAGE_DIR}/${image_name}"
   done
 }
