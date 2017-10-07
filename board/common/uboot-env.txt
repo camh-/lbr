@@ -17,8 +17,9 @@ baudrate=115200
 base_args=setenv bootargs "earlyprintk console=${console},${baudrate} rootwait"
 init_args=setenv bootargs "${bootargs} init=${init}"
 
-tftp_init=usb start
-tftp_load_kernel=dhcp ${kernel_addr_r} ${kernelfile}; tftp ${fdt_addr_r} ${fdtfile}
+tftp_init=run get_netboot_args
+tftp_load_kernel=tftp ${kernel_addr_r} ${bootfile}; tftp ${fdt_addr_r} ${bootfile}.dtb
+
 fat_init=mmc dev 0
 fat_load_kernel=fatload mmc 0:1 ${kernel_addr_r} ${kernelfile}; fatload mmc 0:1 ${fdt_addr_r} ${fdtfile}
 
