@@ -7,3 +7,12 @@ fdt_addr_r=0x43000000
 fdt_high=0xffffffff
 
 nfs_root_dir=sunxi
+
+# Override bootcmd so we can inject fel booting
+bootcmd=run check_fel; run boot
+
+check_fel=if test ${fel_booted:-0} = 1; then setenv bootmode fel; fi
+
+# Fel booting needs no init and the images are already loaded.
+fel_init=true
+fel_load_kernel=true
