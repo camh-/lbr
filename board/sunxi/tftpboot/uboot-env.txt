@@ -1,0 +1,3 @@
+bootmode=tftp
+roottype=nfs
+fel_booted=0

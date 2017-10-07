@@ -24,7 +24,7 @@ fi
 
 if [[ "$1" == 'rdroot' ]] ; then
 	image_args+=(write 0x43300000 rootfs.cpio.uboot)
-elif [[ "$1" == 'uboot' ]] ; then
+elif [[ "$1" =~ ^tftpboot|uboot$ ]] ; then
 	image_args=()
 fi
 
