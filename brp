@@ -249,33 +249,42 @@ find_fragments() {
 # Search for a defconfig fragment named <fragment> starting at the current
 # board directory, and following the chain of parents back from the board
 # dir. Also look in the project directory and the core directory.
-# The search stops when the named fragment is found.
+# Output all the fragments matched in reverse order of the above search.
+# This orders most-specific fragments after more general fragments so the
+# specific ones can override the general ones.
 find_fragment() {
   local fragment="$1" dir
+  local found=false
   local -a parents cfg_dirs
   get_parents parents "${BRP_BOARD_DIR}"
-  cfg_dirs=("${BRP_BOARD_DIR}" \
-    "${parents[@]}" \
+  cfg_dirs=(
+    "${BRP_CORE_DIR}" \
     "${BRP_PROJECT_DIR}" \
-    "${BRP_CORE_DIR}"
+    "${parents[@]}" \
+    "${BRP_BOARD_DIR}" \
   )
   for dir in "${cfg_dirs[@]}"; do
     local f="${dir}/config/${fragment}"
     if [[ -f "${f}" ]]; then
       printf '%s\n' "${f}"
-      return 0
+      found=true
     fi
   done
 
-  printf 'Could not find defconfig fragment: %s\n' "${fragment}" >&2
-  return 1
+  if ! "${found}"; then
+    printf 'Could not find defconfig fragment: %s\n' "${fragment}" >&2
+    return 1
+  fi
+
+  return 0
 }
 
 # ----------------------------------------------------------------------------
 # get_parents <array_name> <board_dir>
 # Find all the parent directories of a board directory.
 # Parent directories are found by following the "parent" symlink in each
-# board dir until there are no more "parent" symlinks.
+# board dir until there are no more "parent" symlinks. The order is parents
+# before children.
 # $1: Name of array to put the parent dirs in.
 # $2: The board directory to start from.
 get_parents() {
@@ -284,7 +293,7 @@ get_parents() {
 
   while [[ -d "${dir}/parent" ]]; do
     dir=$(realpath "${dir}/parent")
-    _parents+=("${dir}")
+    _parents=("${dir}" "${_parents[@]}")
   done
 }
 
