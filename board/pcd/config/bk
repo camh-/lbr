@@ -3,4 +3,4 @@ BR2_LINUX_KERNEL_INTREE_DTS_NAME="sun7i-a20-pcduino3-nano"
 BR2_TARGET_UBOOT_BOARD_DEFCONFIG="Linksprite_pcDuino3_Nano"
 BR2_TARGET_UBOOT_NEEDS_DTC=y
 BR2_TARGET_UBOOT_NEEDS_PYLIBFDT=y
-BRP_CONFIG_FRAGMENTS="local sdk_client overlay common-uboot sunxi-uboot sunxi-kernel"
+BRP_CONFIG_FRAGMENTS="local sdk_client overlay uboot sunxi-kernel"
