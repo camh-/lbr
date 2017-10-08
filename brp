@@ -211,8 +211,8 @@ merge_config() {
   local -a fragments
   # shellcheck disable=SC2086
   # We want to split on spaces for BRP_CONFIG_FRAGMENTS
-  fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
-  kconfig_merge "${fragments[@]}" "${brpconfig}" > "${BR2_DEFCONFIG}"
+  fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS} "${phase}"))
+  kconfig_merge "${fragments[@]}" > "${BR2_DEFCONFIG}"
 }
 
 # ----------------------------------------------------------------------------
@@ -230,7 +230,10 @@ demerge_config() {
   local -a fragments
   # shellcheck disable=SC2086
   # We want to split on spaces for BRP_CONFIG_FRAGMENTS
-  fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS}))
+  fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS} "${phase}"))
+  # Dont use the last fragment as that is the phase config (brpconfig).
+  # If we demerge that, we remove what we want to remain.
+  unset fragments[-1]
   kconfig_demerge "${BR2_DEFCONFIG}" "${fragments[@]}" > "${brpconfig}"
 }
 
