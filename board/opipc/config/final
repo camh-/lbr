@@ -1,0 +1,2 @@
+BRP_CONFIG_FRAGMENTS="local sdk_client overlay"
+BRP_OVERLAY_IMAGES="arm-a7-gnueabihf/base bk"
