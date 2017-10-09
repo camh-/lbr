@@ -1,0 +1,3 @@
+# opi plus net seems to be broken-ish. This first dhcp fails, but the later
+# one will work.
+net_init=dhcp
