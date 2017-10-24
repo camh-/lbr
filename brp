@@ -494,18 +494,19 @@ setup() {
 
   parse_args "$@"
 
-  load_config || return 1
-
   BRP_CORE_DIR="${BRP_ROOT}/core"
   BRP_PROJECT_DIR="${BRP_ROOT}/${project}"
-  BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
-  BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
-  BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
   BRP_BOARD_DIR="${BRP_PROJECT_DIR}/board/${board}"
 
   BRP_PROJECT="${project}"
   BRP_BOARD="${board}"
   BRP_PHASE="${phase}"
+
+  load_config || return 1
+
+  BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
+  BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
+  BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
 
   find_buildroot
 
@@ -560,9 +561,9 @@ parse_args() {
   (( $# == 2 )) && { board="$1"; shift; }
   phase="$1"
 
-  [[ -n "${project}" ]] || usage 1 >&2
-  [[ -n "${board}" ]] || usage 1 >&2
-  [[ -n "${phase}" ]] || usage 1 >&2
+  [[ -n "${project}" ]] || { printf 'Missing project\n'; usage 1 >&2; }
+  [[ -n "${board}" ]] || { printf 'Missing board\n'; usage 1 >&2; }
+  [[ -n "${phase}" ]] || { printf 'Missing phase\n'; usage 1 >&2; }
 }
 
 # ----------------------------------------------------------------------------
@@ -659,7 +660,7 @@ load_config() {
   local -a search=(
   "${xdg[@]/%//brp}"
   "${XDG_CONFIG_HOME:-$HOME/.config}/brp"
-  "${project}/brp.conf")
+  "${BRP_PROJECT_DIR}/brp.conf")
   for path in "${search[@]}" ; do
     if [[ -f "$path" ]] ; then
       # shellcheck disable=SC1090
