@@ -569,6 +569,7 @@ parse_args() {
 # ----------------------------------------------------------------------------
 parse_options() {
   target="$1"; shift
+  OPTIND=1
   while getopts ":${OPTIONS[${target}]-}" opt; do
     handle_getopt_errors "${target}" "${opt}"
     handle_option "${target}" "${opt}"
