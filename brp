@@ -20,9 +20,11 @@ source "${script_dir}/kconfig.sh"
 MAKE=make
 
 declare -A OPTIONS=(
-  [global]='h'
+  [global]='hn'
   [linuxup]='go'
 )
+
+dryrun=false
 
 OPT_linuxup_git=false
 OPT_linuxup_oldconfig=false
@@ -33,6 +35,7 @@ usage() {
 Usage: $program_name [options] <target> [target-options] [project] [board] <phase>
 Options are:
   -h: Show this help message
+  -n: Dry run. Show commands but dont execute them
 
 Phases are defined with a <project>/board/<board>/config/<phase> defconfig file.
 <project> is optional if CWD is the project dir.
@@ -471,7 +474,7 @@ target_has_options() {
 # ----------------------------------------------------------------------------
 run() {
   echo "$@"
-  [[ "${dryrun}" -ne 0 ]] || "$@"
+  "${dryrun}" || "$@"
 }
 
 # ----------------------------------------------------------------------------
@@ -524,8 +527,6 @@ setup() {
   )
 
   [[ "$V" == '1' ]] && make_args+=("V=1")
-
-  dryrun=0
 
   make_output_dirs
 
@@ -588,6 +589,9 @@ handle_global_option() {
   case "$1" in
     h)
       usage 0
+      ;;
+    n)
+      dryrun=true
       ;;
   esac
 }
