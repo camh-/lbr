@@ -1,24 +1,24 @@
-config BRP_CONFIG_FRAGMENTS
+config LBR_CONFIG_FRAGMENTS
 	string "Fragments to add to this config"
 	help
 	  Fragments to combine to create the defconfig.
 
 	  The defconfig for the build can be build from fragments so you
 	  do not need to specify the same configuration for multiple
-	  phases. Each fragment is applied in order with this config
+	  layers. Each fragment is applied in order with this config
 	  being applied last. The latest value for a setting overrides
 	  any previous values.
 
-	  When the defconfig for this phase is saved, the fragments are
+	  When the defconfig for this layer is saved, the fragments are
 	  removed so as to leave a minimal defconfig that contains only
-	  the configuration items specific to this phase.
+	  the configuration items specific to this layer.
 
 	  Config fragments are found by searching in the board's config
 	  directory, the config directory of each element in the parent
 	  chain for the board, the project's config directory and the
 	  core config directory, in that order.
 
-config BRP_BUILD_OVERLAY
+config LBR_BUILD_OVERLAY
        bool "Build an overlay-only image"
        default n
        help
@@ -32,19 +32,19 @@ config BRP_BUILD_OVERLAY
          overlay without the skeleton parts of the image so that it
          can be overlayed over a standard buildroot rootfs image.
 
-	 This option is only applied if the BRP_CORE post-build script
-	 is executed, by adding $(BR2_EXTERNAL_BRP_CORE_PATH)/post-build.sh
+	 This option is only applied if the LBR_CORE post-build script
+	 is executed, by adding $(BR2_EXTERNAL_LBR_CORE_PATH)/post-build.sh
 	 to BR2_ROOTFS_POST_BUILD_SCRIPT.
 
-config BRP_OVERLAY_IMAGES
-	string "Phase image overlays to add to this phase"
+config LBR_OVERLAY_IMAGES
+	string "Layer image overlays to add to this layer"
 	help
 	  Overlay images to incorporate into this build.
 
-	  Image names should be specified as <phase> or <board>/<phase>.
+	  Image names should be specified as <layer> or <board>/<layer>.
 	  Image names without a <board> refer to the current board.
 
-config BRP_BUILD_BOARD_IMAGE
+config LBR_BUILD_BOARD_IMAGE
 	bool "Build ultimate board image"
 	default n
 	help
@@ -53,4 +53,4 @@ config BRP_BUILD_BOARD_IMAGE
 	  This is done by invoking the build-image.sh script in the
 	  board directory. The current working directory will be the
 	  board image directory when build-image.sh is invoked (not
-	  the phase image directory).
+	  the layer image directory).

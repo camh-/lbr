@@ -2,9 +2,9 @@
 # vim: set ts=8 sw=2 sts=2 et sta fileencoding=utf-8:
 #
 # -----------------------------------------------------------------------------
-# buildroot phased build script
+# buildroot layered build script
 #
-# This script exists to orchestrate the multiple phases of buildroot that are
+# This script exists to orchestrate the multiple layers of buildroot that are
 # used to generate the sdk, bootloader, kernel image and the base
 # root filesystem.
 #
@@ -12,7 +12,7 @@
 # =============================================================================
 
 install_prefix='/usr/local'
-share_dir="${install_prefix}/share/brp"
+share_dir="${install_prefix}/share/lbr"
 
 # -----------------------------------------------------------------------------
 
@@ -31,17 +31,17 @@ OPT_linuxup_oldconfig=false
 # ----------------------------------------------------------------------------
 usage() {
   cat <<EOF
-Usage: $program_name [options] <target> [target-options] [board] <phase>
+Usage: $program_name [options] <target> [target-options] [board] <layer>
 Options are:
   -h: Show this help message
   -n: Dry run. Show commands but dont execute them
 
-Phases are defined with a board/<board>/config/<phase> defconfig file.
+Layers are defined with a board/<board>/config/<layer> defconfig file.
 <board> is optional if CWD is a board dir.
 Targets are:
-  build:   Build the phase.
-  *config: Run make *config on the target, saving the minimal phase defconfig.
-  clean:   Remove the output directory for the phase.
+  build:   Build the layer.
+  *config: Run make *config on the target, saving the minimal layer defconfig.
+  clean:   Remove the output directory for the layer.
   linuxup: Update the linux kernel config to the next version of linux.
     -g:      Add new config files to git before savedefconfig.
   <other>: Other target are passed through to buildroot make.
@@ -55,9 +55,9 @@ main() {
   setup "$@" || exit 1
 
   if known_target "${target}" ; then
-    eval "target_${target}" "${phase}"
+    eval "target_${target}" "${layer}"
   else
-    target_unknown "${target}" "${phase}"
+    target_unknown "${target}" "${layer}"
   fi
 
   return 0
@@ -72,8 +72,8 @@ main() {
 
 # ----------------------------------------------------------------------------
 target_build() {
-  if phase_has_build_function "${phase}" ; then
-    eval "build_${phase}"
+  if layer_has_build_function "${layer}" ; then
+    eval "build_${layer}"
   else
     build
   fi
@@ -81,15 +81,15 @@ target_build() {
 
 # ----------------------------------------------------------------------------
 target_clean() {
-  if [[ -n "${BRP_OUTPUT_DIR}" ]] && [[ -n "${phase}" ]]; then
+  if [[ -n "${LBR_OUTPUT_DIR}" ]] && [[ -n "${layer}" ]]; then
     # shellcheck disable=SC2115
-    run rm -rf "${BRP_OUTPUT_DIR}/${phase}"
+    run rm -rf "${LBR_OUTPUT_DIR}/${layer}"
   fi
 }
 
 # ----------------------------------------------------------------------------
 # linuxup: Update the linux config to the next available version.
-# The phase must have a linux build in the br2 config.
+# The layer must have a linux build in the br2 config.
 #
 # Linux kernel upgrading works like this:
 # Look in the current br2 merged defconfig:
@@ -115,7 +115,7 @@ target_linuxup() {
   next_tag=$(next_linux_version "${BR2_LINUX_KERNEL_CUSTOM_REPO_URL}" "${current_tag}")
   next_version=$(extract_major_minor "${next_tag}")
 
-  kconfig_str_set BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION "${next_tag}" "${brpconfig}"
+  kconfig_str_set BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION "${next_tag}" "${lbrconfig}"
   local dotconfig
   dotconfig=$(uplift_linux_configs "${current_version}" "${next_version}")
 
@@ -146,24 +146,24 @@ target_unknown() {
 
 # ============================================================================
 # BUILD target functions
-# These functions build the images for each specific phases and saves them
-# in the board saved image directory. The default build for a phase is to
+# These functions build the images for each specific layers and saves them
+# in the board saved image directory. The default build for a layer is to
 # call `build` and then copy the resultant images to the image output
-# directory. The default can be overridden by implementing a build_<phase>
+# directory. The default can be overridden by implementing a build_<layer>
 # function.
 
 # ----------------------------------------------------------------------------
 # build
-# Build a phase into its own output directory, logging the process.
-# "make defconfig" is run first to set up the configuration for the phase,
-#   with BR2_DEFCONFIG pointing to the phase's config.
+# Build a layer into its own output directory, logging the process.
+# "make defconfig" is run first to set up the configuration for the layer,
+#   with BR2_DEFCONFIG pointing to the layer's config.
 # $1: (optional) Target to build. Defaults to "all".
 build() {
   # If the defconfig fragment has define BR2_HOST_DIR, we check
   # if it exists and ask for confirmation to proceed if it does.
   # This is to protect against mistakes which might overwrite
   # an external toolchain.
-  kconfig_get BR2_HOST_DIR "${brpconfig}"
+  kconfig_get BR2_HOST_DIR "${lbrconfig}"
   if [[ -n "${BR2_HOST_DIR-}" && -d "${BR2_HOST_DIR}" ]]; then
     echo 'Host dir already exists:' "${BR2_HOST_DIR}"
     read -r -p 'Proceed [y/N]? ' result
@@ -173,7 +173,7 @@ build() {
     fi
   fi
 
-  make_target "${1:-all}" 2>&1 | tee "${log_dir}/${phase}.log"
+  make_target "${1:-all}" 2>&1 | tee "${log_dir}/${layer}.log"
   return "${PIPESTATUS[0]}"
 }
 
@@ -189,14 +189,14 @@ build_sdk() {
 
 # ----------------------------------------------------------------------------
 # make_config_target make_target
-# Run "make <make_target>" for <phase> and save the resulting minimal
+# Run "make <make_target>" for <layer> and save the resulting minimal
 # defconfig in the configs directory.
-# If there is an existing minimal defconfig for <phase>, it will be used as
+# If there is an existing minimal defconfig for <layer>, it will be used as
 # the basis of the menuconfig, otherwise a default config is used.
 make_config_target() {
   make_target="$1"
 
-  [[ -f "${brpconfig}" ]] || run touch "${brpconfig}"
+  [[ -f "${lbrconfig}" ]] || run touch "${lbrconfig}"
 
   merge_config
   run ${MAKE} "${make_args[@]}" defconfig "${make_target}" savedefconfig
@@ -204,38 +204,38 @@ make_config_target() {
 }
 
 # ----------------------------------------------------------------------------
-# Merge the config fragments listed in the BRP_CONFIG_FRAGMENTS of the
-# current phases fragment file and write out a defconfig file to the
+# Merge the config fragments listed in the LBR_CONFIG_FRAGMENTS of the
+# current layers fragment file and write out a defconfig file to the
 # output directory (BR2_DEFCONFIG).
 merge_config() {
-  kconfig_get BRP_CONFIG_FRAGMENTS "${brpconfig}"
+  kconfig_get LBR_CONFIG_FRAGMENTS "${lbrconfig}"
   local -a fragments
   # shellcheck disable=SC2086
-  # We want to split on spaces for BRP_CONFIG_FRAGMENTS
-  fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS} "${phase}"))
+  # We want to split on spaces for LBR_CONFIG_FRAGMENTS
+  fragments=($(find_fragments ${LBR_CONFIG_FRAGMENTS} "${layer}"))
   kconfig_merge "${fragments[@]}" > "${BR2_DEFCONFIG}"
 }
 
 # ----------------------------------------------------------------------------
-# Subtract the fragments listed in the BRP_CONFIG_FRAGMENTS of the current
-# phases defconfig file (BR2_DEFCONFIG) from that defconfig file and write
+# Subtract the fragments listed in the LBR_CONFIG_FRAGMENTS of the current
+# layers defconfig file (BR2_DEFCONFIG) from that defconfig file and write
 # out a fragment file containing the remaining config options. Whiteout
-# entries are written where the current phases defconfig file does not have
+# entries are written where the current layers defconfig file does not have
 # a setting for a variable that is set in one of the fragments. This occurs
 # when a defconfig resets a setting to a default value that has been set to
 # a non-default value in a fragment. Omitting the setting altogether in the
 # fragment would see the setting have the value from the fragment and not
 # the default value when the fragments are re-merged.
 demerge_config() {
-  kconfig_get BRP_CONFIG_FRAGMENTS "${BR2_DEFCONFIG}"
+  kconfig_get LBR_CONFIG_FRAGMENTS "${BR2_DEFCONFIG}"
   local -a fragments
   # shellcheck disable=SC2086
-  # We want to split on spaces for BRP_CONFIG_FRAGMENTS
-  fragments=($(find_fragments ${BRP_CONFIG_FRAGMENTS} "${phase}"))
-  # Dont use the last fragment as that is the phase config (brpconfig).
+  # We want to split on spaces for LBR_CONFIG_FRAGMENTS
+  fragments=($(find_fragments ${LBR_CONFIG_FRAGMENTS} "${layer}"))
+  # Dont use the last fragment as that is the layer config (lbrconfig).
   # If we demerge that, we remove what we want to remain.
   unset fragments[-1]
-  kconfig_demerge "${BR2_DEFCONFIG}" "${fragments[@]}" > "${brpconfig}"
+  kconfig_demerge "${BR2_DEFCONFIG}" "${fragments[@]}" > "${lbrconfig}"
 }
 
 # ----------------------------------------------------------------------------
@@ -260,12 +260,12 @@ find_fragment() {
   local fragment="$1" dir
   local found=false
   local -a parents cfg_dirs
-  get_parents parents "${BRP_BOARD_DIR}"
+  get_parents parents "${LBR_BOARD_DIR}"
   cfg_dirs=(
-    "${BRP_CORE_DIR}" \
-    "${BRP_PROJECT_DIR}" \
+    "${LBR_CORE_DIR}" \
+    "${LBR_PROJECT_DIR}" \
     "${parents[@]}" \
-    "${BRP_BOARD_DIR}" \
+    "${LBR_BOARD_DIR}" \
   )
   for dir in "${cfg_dirs[@]}"; do
     local f="${dir}/config/${fragment}"
@@ -307,8 +307,8 @@ get_parents() {
 make_target() {
   make_target="$1"
 
-  if [[ ! -f "${brpconfig}" ]] ; then
-    echo "No config for phase ${phase} at ${brpconfig}" >&2
+  if [[ ! -f "${lbrconfig}" ]] ; then
+    echo "No config for layer ${layer} at ${lbrconfig}" >&2
     return 1
   fi
 
@@ -327,7 +327,7 @@ post_config() {
   for dir in "${ext_dirs[@]}"; do (
     if [[ -x "${dir}/post-config.sh" ]]; then
       message post-config "${dir}"
-      BR2_CONFIG="${BRP_OUTPUT_DIR}/${BRP_PHASE}/.config"
+      BR2_CONFIG="${LBR_OUTPUT_DIR}/${LBR_LAYER}/.config"
       export BR2_CONFIG
       cd "${dir}" && run "${dir}/post-config.sh" "${dir}"
     fi
@@ -339,25 +339,25 @@ post_config() {
 #
 # ----------------------------------------------------------------------------
 get_linux_br2_config() {
-  if ! kconfig_y BR2_LINUX_KERNEL "${brpconfig}"; then
-    printf 'Linux kernel build not enabled in this phase\n' >&2
+  if ! kconfig_y BR2_LINUX_KERNEL "${lbrconfig}"; then
+    printf 'Linux kernel build not enabled in this layer\n' >&2
     exit 1
   fi
 
-  if ! kconfig_y BR2_LINUX_KERNEL_CUSTOM_GIT "${brpconfig}"; then
+  if ! kconfig_y BR2_LINUX_KERNEL_CUSTOM_GIT "${lbrconfig}"; then
     printf 'You need to be using a custom git repository\n' >&2
     exit 1
   fi
 
-  if ! kconfig_y BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG "${brpconfig}"; then
+  if ! kconfig_y BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG "${lbrconfig}"; then
     printf 'You need to be using a custom config to update it\n' >&2
     exit 1
   fi
 
-  kconfig_get BR2_LINUX_KERNEL_CUSTOM_REPO_URL "${brpconfig}"
-  kconfig_get BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION "${brpconfig}"
-  kconfig_get BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE "${brpconfig}"
-  kconfig_get BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES "${brpconfig}"
+  kconfig_get BR2_LINUX_KERNEL_CUSTOM_REPO_URL "${lbrconfig}"
+  kconfig_get BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION "${lbrconfig}"
+  kconfig_get BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE "${lbrconfig}"
+  kconfig_get BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES "${lbrconfig}"
 }
 
 # ----------------------------------------------------------------------------
@@ -402,7 +402,7 @@ extract_major_minor() {
 # ----------------------------------------------------------------------------
 # uplift_linux_configs <current_version> <next_version>
 # Uplift the linux config file and the linux config fragments from
-# <current_version> to <next_version> and update the br2 phase defconfig
+# <current_version> to <next_version> and update the br2 layer defconfig
 # fragment with the uplifted paths.
 uplift_linux_configs() {
   local cur="$1" next="$2"
@@ -410,7 +410,7 @@ uplift_linux_configs() {
   # Uplift the (def)config file.
   local new_config
   new_config=$(uplift_linux_config "${cur}" "${next}" "${BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE}")
-  kconfig_str_set BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE "${new_config}" "${brpconfig}"
+  kconfig_str_set BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE "${new_config}" "${lbrconfig}"
 
   # Uplift the config file if it exists and was not uplifted before.
   if ! [[ "${BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE}" =~ /"${cur}"/config$ ]]; then
@@ -427,7 +427,7 @@ uplift_linux_configs() {
   for fragment in ${BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES}; do
     linux_fragments+=( "$(uplift_linux_config "${cur}" "${next}" "${fragment}")" )
   done
-  kconfig_str_set BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES "${linux_fragments[*]}" "${brpconfig}"
+  kconfig_str_set BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES "${linux_fragments[*]}" "${lbrconfig}"
 }
 
 # ----------------------------------------------------------------------------
@@ -455,7 +455,7 @@ uplift_linux_config() {
 # UTILITY
 
 # ----------------------------------------------------------------------------
-phase_has_build_function() {
+layer_has_build_function() {
   [[ "$(type -t "build_${1}")" = function ]]
 }
 
@@ -493,52 +493,52 @@ setup() {
 
   parse_args "$@"
 
-  BRP_PROJECT_DIR="${project_dir}"
-  BRP_BOARD_DIR="${BRP_PROJECT_DIR}/board/${board}"
+  LBR_PROJECT_DIR="${project_dir}"
+  LBR_BOARD_DIR="${LBR_PROJECT_DIR}/board/${board}"
 
-  BRP_PROJECT="${project}"
-  BRP_BOARD="${board}"
-  BRP_PHASE="${phase}"
+  LBR_PROJECT="${project}"
+  LBR_BOARD="${board}"
+  LBR_LAYER="${layer}"
 
   load_config || return 1
 
-  BRP_ROOT=${brp_root:-${share_dir}}
-  BRP_CORE_DIR="${BRP_ROOT}/core"
+  LBR_ROOT=${lbr_root:-${share_dir}}
+  LBR_CORE_DIR="${LBR_ROOT}/core"
 
-  BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
-  BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
-  BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
+  LBR_OUTPUT_ROOT="${output_root:-${LBR_PROJECT_DIR}/output}"
+  LBR_OUTPUT_DIR="${LBR_OUTPUT_ROOT}/${board}"
+  LBR_IMAGE_DIR="${LBR_OUTPUT_DIR}"/images
 
   find_buildroot
 
   check_config || return 1
 
   # shellcheck source=/dev/null
-  source "${BRP_ROOT}/kconfig.sh"
+  source "${LBR_ROOT}/kconfig.sh"
 
-  brpconfig="${BRP_BOARD_DIR}/config/${phase}"
+  lbrconfig="${LBR_BOARD_DIR}/config/${layer}"
 
-  log_dir="${BRP_OUTPUT_DIR}"/logs
+  log_dir="${LBR_OUTPUT_DIR}"/logs
 
-  export BR2_EXTERNAL="${BRP_CORE_DIR}:${BRP_PROJECT_DIR}"
-  export BR2_DEFCONFIG="${BRP_OUTPUT_DIR}/${phase}/defconfig"
+  export BR2_EXTERNAL="${LBR_CORE_DIR}:${LBR_PROJECT_DIR}"
+  export BR2_DEFCONFIG="${LBR_OUTPUT_DIR}/${layer}/defconfig"
   make_args=(
     -C "${buildroot}"
-    "O=${BRP_OUTPUT_DIR}/${phase}"
+    "O=${LBR_OUTPUT_DIR}/${layer}"
   )
 
   [[ "$V" == '1' ]] && make_args+=("V=1")
 
   make_output_dirs
 
-  export BRP_ROOT BRP_PROJECT_DIR BRP_OUTPUT_ROOT BRP_OUTPUT_DIR \
-    BRP_IMAGE_DIR BRP_BOARD_DIR BRP_PROJECT BRP_BOARD BRP_PHASE
+  export LBR_ROOT LBR_PROJECT_DIR LBR_OUTPUT_ROOT LBR_OUTPUT_DIR \
+    LBR_IMAGE_DIR LBR_BOARD_DIR LBR_PROJECT LBR_BOARD LBR_LAYER
 }
 
 # ----------------------------------------------------------------------------
 parse_args() {
   # Normal usage is:
-  #  brp [options] <target> [target-options] <board> <config>
+  #  lbr [options] <target> [target-options] <board> <config>
   # but we can infer the board from $PWD if appropriate.
   # If we are in a board dir, we don't require that args.
   # Use these CWD defaults if not explicitly given on the cmdline.
@@ -559,10 +559,10 @@ parse_args() {
   shift $((OPTIND-1))
 
   (( $# == 2 )) && { board="$1"; shift; }
-  phase="$1"
+  layer="$1"
 
   [[ -n "${board}" ]] || { printf 'Missing board\n'; usage 1 >&2; }
-  [[ -n "${phase}" ]] || { printf 'Missing phase\n'; usage 1 >&2; }
+  [[ -n "${layer}" ]] || { printf 'Missing layer\n'; usage 1 >&2; }
 }
 
 # ----------------------------------------------------------------------------
@@ -623,10 +623,10 @@ handle_getopt_errors() {
 # ----------------------------------------------------------------------------
 find_buildroot() {
   if [[ -z "${buildroot-}" ]]; then
-    if [[ -e "${BRP_PROJECT_DIR}/buildroot" ]]; then
-      buildroot="${BRP_PROJECT_DIR}/buildroot"
-    elif [[ -e "${BRP_ROOT}"/buildroot ]]; then
-      buildroot="${BRP_ROOT}/buildroot"
+    if [[ -e "${LBR_PROJECT_DIR}/buildroot" ]]; then
+      buildroot="${LBR_PROJECT_DIR}/buildroot"
+    elif [[ -e "${LBR_ROOT}"/buildroot ]]; then
+      buildroot="${LBR_ROOT}/buildroot"
     fi
   fi
 }
@@ -636,9 +636,9 @@ load_config() {
   local -a xdg
   IFS=: read -r -a xdg <<< "${XDG_CONFIG_DIRS:-/etc/xdg}"
   local -a search=(
-  "${xdg[@]/%//brp}"
-  "${XDG_CONFIG_HOME:-$HOME/.config}/brp"
-  "${BRP_PROJECT_DIR}/brp.conf")
+  "${xdg[@]/%//lbr}"
+  "${XDG_CONFIG_HOME:-$HOME/.config}/lbr"
+  "${LBR_PROJECT_DIR}/lbr.conf")
   for path in "${search[@]}" ; do
     if [[ -f "$path" ]] ; then
       # shellcheck disable=SC1090
@@ -655,8 +655,8 @@ check_config() {
     echo "'buildroot' not set in config. Where is buildroot?" >&2
     return 1
   fi
-  if ! [[ -d "${BRP_BOARD_DIR}" ]] ; then
-    echo "board dir missing: ${BRP_BOARD_DIR}" >&2
+  if ! [[ -d "${LBR_BOARD_DIR}" ]] ; then
+    echo "board dir missing: ${LBR_BOARD_DIR}" >&2
     return 1
   fi
   return 0
@@ -664,8 +664,8 @@ check_config() {
 
 # ----------------------------------------------------------------------------
 make_output_dirs() {
-  for dir in "${BRP_OUTPUT_DIR}" "${BRP_IMAGE_DIR}" "${log_dir}" \
-    "${BRP_OUTPUT_DIR}/${phase}"; do
+  for dir in "${LBR_OUTPUT_DIR}" "${LBR_IMAGE_DIR}" "${log_dir}" \
+    "${LBR_OUTPUT_DIR}/${layer}"; do
   if [[ ! -d "${dir}" ]]; then
     if [[ ! -e "${dir}" ]]; then
       run mkdir -p "${dir}"

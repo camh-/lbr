@@ -1,7 +1,7 @@
 #!/bin/bash
 # vim: set ts=8 sw=2 sts=2 et sta fileencoding=utf-8:
 #
-# post-build, post-fakeroot and post-image script for core brp features.
+# post-build, post-fakeroot and post-image script for core lbr features.
 # One script because there is a lot of common functionality, but should be
 # named post-build.sh, post-fakeroot.sh or post-image.sh to invoke the
 # correct function. Those names should be symlinks to this script.
@@ -9,7 +9,7 @@
 #-----------------------------------------------------------------------------
 
 KCONFIG="${BR2_CONFIG}"
-source "${BRP_ROOT}"/kconfig.sh
+source "${LBR_ROOT}"/kconfig.sh
 
 #-----------------------------------------------------------------------------
 usage() {
@@ -62,13 +62,13 @@ parse_args() {
 #-----------------------------------------------------------------------------
 post_config() {
   # Ensure buildroot runs our post-{build,fakeroot,image}.sh scripts
-  local d='$(BR2_EXTERNAL_BRP_CORE_PATH)'
+  local d='$(BR2_EXTERNAL_LBR_CORE_PATH)'
   kconfig_str_append BR2_ROOTFS_POST_BUILD_SCRIPT "${d}/post-build.sh"
   kconfig_str_append BR2_ROOTFS_POST_FAKEROOT_SCRIPT "${d}/post-fakeroot.sh"
   kconfig_str_append BR2_ROOTFS_POST_IMAGE_SCRIPT "${d}/post-image.sh"
 
   # Override some defaults when building an overlay image
-  if kconfig_y BRP_BUILD_OVERLAY; then
+  if kconfig_y LBR_BUILD_OVERLAY; then
 
     # Use an empty skeleton if none configured
     if kconfig_y BR2_ROOTFS_SKELETON_CUSTOM; then
@@ -78,7 +78,7 @@ post_config() {
       fi
     fi
 
-  fi  # BRP_BUILD_OVERLAY=y
+  fi  # LBR_BUILD_OVERLAY=y
 }
 
 #-----------------------------------------------------------------------------
@@ -91,7 +91,7 @@ post_build() {
       /usr/lib32
   )
 
-  if kconfig_y BRP_BUILD_OVERLAY; then
+  if kconfig_y LBR_BUILD_OVERLAY; then
     message "Cleaning target dir for overlay"
     rm_unwanted "${target_dir}" "${unwanted[@]}"
     clean_empty "${target_dir}"
@@ -105,15 +105,15 @@ post_fakeroot() {
       /dev/console
   )
 
-  if kconfig_y BRP_BUILD_OVERLAY; then
+  if kconfig_y LBR_BUILD_OVERLAY; then
     message "Cleaning target dir for overlay"
     rm_unwanted "${target_dir}" "${unwanted[@]}"
     clean_empty "${target_dir}"
   fi
 
   local image_file
-  kconfig_get BRP_OVERLAY_IMAGES
-  for image in ${BRP_OVERLAY_IMAGES-}; do
+  kconfig_get LBR_OVERLAY_IMAGES
+  for image in ${LBR_OVERLAY_IMAGES-}; do
     image_file=$(get_image_file "${image}") || continue
     message "Extracting image ${image}"
     tar -x -f "${image_file}" -C "${target_dir}"
@@ -124,22 +124,22 @@ post_fakeroot() {
 post_image() {
   local image_dir="$1"
 
-  # When building a board image, we copy the phase images into the board
-  # image directory without renaming them (i.e. without adding the phase
+  # When building a board image, we copy the layer images into the board
+  # image directory without renaming them (i.e. without adding the layer
   # name to the image). This gives these final board images a consistent
   # name for the build-image script to work with.
   local rename_arg
-  kconfig_y BRP_BUILD_BOARD_IMAGE && rename_arg='norename'
+  kconfig_y LBR_BUILD_BOARD_IMAGE && rename_arg='norename'
 
   message 'Copying images to board dir'
   copy_images "${image_dir}" "${rename_arg}"
 
-  if kconfig_y BRP_BUILD_BOARD_IMAGE; then
-    if [[ -x "${BRP_BOARD_DIR}/build-image.sh" ]]; then
+  if kconfig_y LBR_BUILD_BOARD_IMAGE; then
+    if [[ -x "${LBR_BOARD_DIR}/build-image.sh" ]]; then
       message 'Building board image'
       (
-        cd "${BRP_IMAGE_DIR}" && \
-          "${BRP_BOARD_DIR}/build-image.sh" "${BRP_IMAGE_DIR}"
+        cd "${LBR_IMAGE_DIR}" && \
+          "${LBR_BOARD_DIR}/build-image.sh" "${LBR_IMAGE_DIR}"
       )
     fi
   fi
@@ -164,17 +164,17 @@ clean_empty() {
 
 #-----------------------------------------------------------------------------
 get_image_file() {
-  # $1: image name, either <board>/<phase> or <phase>. In the latter case,
+  # $1: image name, either <board>/<layer> or <layer>. In the latter case,
   #     the board is the same as what we are.
   if [[ "$1" =~ ([^/]*)/([^/]*) ]]; then
-    local image_dir="${BRP_OUTPUT_ROOT}/${BASH_REMATCH[1]}/images"
-    local image_phase="${BASH_REMATCH[2]}"
+    local image_dir="${LBR_OUTPUT_ROOT}/${BASH_REMATCH[1]}/images"
+    local image_layer="${BASH_REMATCH[2]}"
   else
-    local image_dir="${BRP_IMAGE_DIR}"
-    local image_phase="$1"
+    local image_dir="${LBR_IMAGE_DIR}"
+    local image_layer="$1"
   fi
   shopt -s nullglob
-  local image_file=("${image_dir}/rootfs-${image_phase}.tar"*)
+  local image_file=("${image_dir}/rootfs-${image_layer}.tar"*)
   case "${#image_file[@]}" in
     0)
       printf 'Could not locate image: %s\n' "$1" >&2
@@ -189,8 +189,8 @@ get_image_file() {
 }
 
 #-----------------------------------------------------------------------------
-# Copy images from a phase image directory to the board image directory.
-# rootfs images will be renamed to add "-<phase>" into the name.
+# Copy images from a layer image directory to the board image directory.
+# rootfs images will be renamed to add "-<layer>" into the name.
 # An uncompressed rootfs image will not be copied if there is also a
 # compressed rootfs image. Only the compressed image will be copied.
 # All other non-rootfs images will be copied.
@@ -211,9 +211,9 @@ copy_images() {
       fi
     fi
     printf '%s: copying as ' "${image_name}"
-    [[ "${2-}" != 'norename' ]] && image_name="${image_name/rootfs/rootfs-${BRP_PHASE}}"
+    [[ "${2-}" != 'norename' ]] && image_name="${image_name/rootfs/rootfs-${LBR_LAYER}}"
     printf '%s\n' "${image_name}"
-    cp -a "${image}" "${BRP_IMAGE_DIR}/${image_name}"
+    cp -a "${image}" "${LBR_IMAGE_DIR}/${image_name}"
   done
 }
 
