@@ -578,7 +578,7 @@ parse_options() {
 # ----------------------------------------------------------------------------
 handle_option() {
   if target_has_options "$1"; then
-    handle_${target}_option "${opt}"
+    "handle_${target}_option" "${opt}"
   fi
 }
 
