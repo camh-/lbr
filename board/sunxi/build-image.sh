@@ -33,17 +33,9 @@ init() {
 
 main() {
   init
-  link_rootfs
   link_dtb "$@"
   make_images sd nfs
   make_fel_image rd
-}
-
-link_rootfs() {
-  # The rootfs file will be named after the current phase ($BRP_PHASE).
-  # Link to it with the generic rootfs.ext4 name so the genimage config
-  # will work.
-  ln -sf "rootfs-${BRP_PHASE}.ext4" 'rootfs.ext4'
 }
 
 link_dtb() {
