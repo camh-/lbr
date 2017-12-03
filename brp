@@ -11,9 +11,8 @@
 
 # =============================================================================
 
-script_dir=$(dirname "$(realpath "$0")")
-# shellcheck source=/dev/null
-source "${script_dir}/kconfig.sh"
+install_prefix='/usr/local'
+share_dir="${install_prefix}/share/brp"
 
 # -----------------------------------------------------------------------------
 
@@ -32,14 +31,13 @@ OPT_linuxup_oldconfig=false
 # ----------------------------------------------------------------------------
 usage() {
   cat <<EOF
-Usage: $program_name [options] <target> [target-options] [project] [board] <phase>
+Usage: $program_name [options] <target> [target-options] [board] <phase>
 Options are:
   -h: Show this help message
   -n: Dry run. Show commands but dont execute them
 
-Phases are defined with a <project>/board/<board>/config/<phase> defconfig file.
-<project> is optional if CWD is the project dir.
-<board> is also optional if CWD is the project's board dir.
+Phases are defined with a board/<board>/config/<phase> defconfig file.
+<board> is optional if CWD is a board dir.
 Targets are:
   build:   Build the phase.
   *config: Run make *config on the target, saving the minimal phase defconfig.
@@ -493,12 +491,9 @@ message() {
 setup() {
   program_name=${0##*/}
 
-  BRP_ROOT=$(find_brp_root)
-
   parse_args "$@"
 
-  BRP_CORE_DIR="${BRP_ROOT}/core"
-  BRP_PROJECT_DIR="${BRP_ROOT}/${project}"
+  BRP_PROJECT_DIR="${project_dir}"
   BRP_BOARD_DIR="${BRP_PROJECT_DIR}/board/${board}"
 
   BRP_PROJECT="${project}"
@@ -507,6 +502,9 @@ setup() {
 
   load_config || return 1
 
+  BRP_ROOT=${brp_root:-${share_dir}}
+  BRP_CORE_DIR="${BRP_ROOT}/core"
+
   BRP_OUTPUT_ROOT="${output_root:-${BRP_PROJECT_DIR}/output}"
   BRP_OUTPUT_DIR="${BRP_OUTPUT_ROOT}/${board}"
   BRP_IMAGE_DIR="${BRP_OUTPUT_DIR}"/images
@@ -514,6 +512,9 @@ setup() {
   find_buildroot
 
   check_config || return 1
+
+  # shellcheck source=/dev/null
+  source "${BRP_ROOT}/kconfig.sh"
 
   brpconfig="${BRP_BOARD_DIR}/config/${phase}"
 
@@ -537,17 +538,16 @@ setup() {
 # ----------------------------------------------------------------------------
 parse_args() {
   # Normal usage is:
-  #  brp [options] <target> [target-options] <project> <board> <config>
-  # but we can infer project and board from $PWD if appropriate.
-  # If we are in the project dir, then we don't require that arg.
-  # If we are in a projects board dir, we don't require those args.
+  #  brp [options] <target> [target-options] <board> <config>
+  # but we can infer the board from $PWD if appropriate.
+  # If we are in a board dir, we don't require that args.
   # Use these CWD defaults if not explicitly given on the cmdline.
-  if [[ ${PWD} =~ ${BRP_ROOT}/([^/]*)(/board/([^/]*))? ]]; then
-    if [[ -n "${BASH_REMATCH[3]-}" ]]; then
-      board="${BASH_REMATCH[3]}"
-    fi
-    project="${BASH_REMATCH[1]}"
+  project_dir="${PWD}"
+  if [[ "${project_dir}" =~ (.*)/board/([^/]*)(/.*)? ]]; then
+    project_dir="${BASH_REMATCH[1]}"
+    board="${BASH_REMATCH[2]}"
   fi
+  project="${dir##*/}"
 
   parse_options 'global' "$@"
   shift $((OPTIND-1))
@@ -558,11 +558,9 @@ parse_args() {
   parse_options "${target}" "$@"
   shift $((OPTIND-1))
 
-  (( $# == 3 )) && { project="$1"; shift; }
   (( $# == 2 )) && { board="$1"; shift; }
   phase="$1"
 
-  [[ -n "${project}" ]] || { printf 'Missing project\n'; usage 1 >&2; }
   [[ -n "${board}" ]] || { printf 'Missing board\n'; usage 1 >&2; }
   [[ -n "${phase}" ]] || { printf 'Missing phase\n'; usage 1 >&2; }
 }
@@ -620,31 +618,6 @@ handle_getopt_errors() {
       usage 1 >&2
       ;;
   esac
-}
-
-# ----------------------------------------------------------------------------
-find_brp_root() {
-  # If we are inside a brp project dir, then use its parent as the
-  # brp root. Otherwise try to find it based on the path to $0 and
-  # failing that, $PWD.
-  # A brp project dir is also a BR2_EXTERNAL dir, which requires
-  # external.desc to exist. Use that to determine if we are in a brp
-  # project dir.
-  local prj_dir
-  prj_dir=$(realpath "${PWD}")
-  while [[ "${prj_dir}" ]] && ! [[ -f "${prj_dir}/external.desc" ]]; do
-    prj_dir="${prj_dir%/*}"
-  done
-
-  if [[ "${prj_dir}" ]]; then
-    prog_dir="${prj_dir%/*}"
-  elif [[ "$0" =~ / ]]; then
-    prog_dir=$(dirname "$(realpath "$0")")
-  else
-    prog_dir=''
-  fi
-
-  printf '%s\n' "${prog_dir:-${PWD}}"
 }
 
 # ----------------------------------------------------------------------------
