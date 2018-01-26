@@ -503,6 +503,7 @@ setup() {
   load_config || return 1
 
   LBR_ROOT=${lbr_root:-${share_dir}}
+  LBR_LIB_DIR="${LBR_ROOT}/lib"
   LBR_CORE_DIR="${LBR_ROOT}/core"
 
   LBR_OUTPUT_ROOT="${output_root:-${LBR_PROJECT_DIR}/output}"
@@ -531,7 +532,7 @@ setup() {
 
   make_output_dirs
 
-  export LBR_ROOT LBR_PROJECT_DIR LBR_OUTPUT_ROOT LBR_OUTPUT_DIR \
+  export LBR_ROOT LBR_LIB_DIR LBR_PROJECT_DIR LBR_OUTPUT_ROOT LBR_OUTPUT_DIR \
     LBR_IMAGE_DIR LBR_BOARD_DIR LBR_PROJECT LBR_BOARD LBR_LAYER
 }
 
