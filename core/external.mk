@@ -22,7 +22,7 @@ ifeq (,$(LINUX_KCONFIG_FRAGMENT_FILES))
 linux-config-demerge: linux-update-defconfig
 else
 linux-config-demerge: linux-savedefconfig
-	$(LBR_ROOT)/kconfig.sh demerge $(LINUX_DIR)/defconfig \
+	$(LBR_LIB_DIR)/kconfig.sh demerge $(LINUX_DIR)/defconfig \
 		$(LINUX_KCONFIG_FRAGMENT_FILES) > $(LINUX_KCONFIG_FILE)
 	cp $(LINUX_DIR)/.config $(dir $(LINUX_KCONFIG_FILE))/config
 endif

@@ -515,7 +515,7 @@ setup() {
   check_config || return 1
 
   # shellcheck source=/dev/null
-  source "${LBR_ROOT}/kconfig.sh"
+  source "${LBR_LIB_DIR}/kconfig.sh"
 
   lbrconfig="${LBR_BOARD_DIR}/config/${layer}"
 
