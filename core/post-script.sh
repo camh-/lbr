@@ -129,20 +129,22 @@ post_image() {
   # name to the image). This gives these final board images a consistent
   # name for the build-image script to work with.
   local rename_arg
-  kconfig_y LBR_BUILD_BOARD_IMAGE && rename_arg='norename'
+  kconfig_y LBR_RENAME_LAYER_IMAGE || rename_arg='norename'
 
   message 'Copying images to board dir'
   copy_images "${image_dir}" "${rename_arg}"
 
-  if kconfig_y LBR_BUILD_BOARD_IMAGE; then
-    if [[ -x "${LBR_BOARD_DIR}/build-image.sh" ]]; then
-      message 'Building board image'
+  kconfig_get LBR_POST_IMAGE_SCRIPTS
+  local script
+  for script in ${LBR_POST_IMAGE_SCRIPTS-}; do
+    [[ "${script}" =~ ^[^/] ]] && script=$(locate_source "${script}")
+    if [[ -x "${script}" ]]; then
+      message "Running lbr post-script ${script}"
       (
-        cd "${LBR_IMAGE_DIR}" && \
-          "${LBR_BOARD_DIR}/build-image.sh" "${LBR_IMAGE_DIR}"
+        cd "${LBR_IMAGE_DIR}" && "${script}" "${LBR_IMAGE_DIR}"
       )
     fi
-  fi
+  done
 }
 
 #-----------------------------------------------------------------------------
@@ -205,7 +207,7 @@ copy_images() {
     fi
     # don't copy an empty image tar file
     if [[ "${image_name}" =~ ^rootfs\.tar* ]]; then
-      if [[ "$(tar -t -f "${image}")" == './' ]]; then
+      if [[ "$(tar -t -f "${image}" | head -n 2)" == './' ]]; then
         printf '%s: skipping empty image\n' "${image_name}"
         continue
       fi
@@ -213,8 +215,29 @@ copy_images() {
     printf '%s: copying as ' "${image_name}"
     [[ "${2-}" != 'norename' ]] && image_name="${image_name/rootfs/rootfs-${LBR_LAYER}}"
     printf '%s\n' "${image_name}"
-    cp -a "${image}" "${LBR_IMAGE_DIR}/${image_name}"
+    if [[ -L "${image}" ]] && [[ "${2-}" != 'norename' ]]; then
+      local target
+      target=$(readlink "${image}")
+      ln -nsf "${target/rootfs/rootfs-${LBR_LAYER}}" "${LBR_IMAGE_DIR}/${image_name}"
+    else
+      cp -a "${image}" "${LBR_IMAGE_DIR}/${image_name}"
+    fi
   done
+}
+
+#-----------------------------------------------------------------------------
+locate_source() {
+  _locate_source "${LBR_BOARD_DIR}" "$1"
+}
+
+_locate_source() {
+  if [[ -e "$1/$2" ]] ; then
+    readlink -f "$1/$2"
+  elif [[ -L "$1/parent" ]] ; then
+    _locate "$1/parent" "$2"
+  else
+    return 1
+  fi
 }
 
 #-----------------------------------------------------------------------------

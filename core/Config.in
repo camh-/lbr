@@ -44,13 +44,35 @@ config LBR_OVERLAY_IMAGES
 	  Image names should be specified as <layer> or <board>/<layer>.
 	  Image names without a <board> refer to the current board.
 
-config LBR_BUILD_BOARD_IMAGE
-	bool "Build ultimate board image"
-	default n
+config LBR_POST_IMAGE_SCRIPTS
+	string "Post-image scripts to run after lbr post-image"
 	help
-	  Build the ultimate image for the board.
+	  Space-separated list of scripts to run after copying images.
 
-	  This is done by invoking the build-image.sh script in the
-	  board directory. The current working directory will be the
-	  board image directory when build-image.sh is invoked (not
-	  the layer image directory).
+	  lbr copies the layer images into the board images directory as
+	  part of the post-build. The script listed here will be run
+	  after those images have been copied. If a script is not an
+	  absolute path, it is located by searching the board hierarchy.
+
+	  The scripts will be run with the board image directory as the
+	  current directory, which will also be passed as the first
+	  argument.
+
+	  If you want to run scripts before the lbr post-image processing,
+	  add the scripts to the buildroot BR2_ROOTFS_POST_IMAGE_SCRIPT
+	  variable.
+
+config LBR_RENAME_LAYER_IMAGE
+	bool "Add layer name to build images"
+	default y
+	help
+	  Name images with the layer when copying to the board image dir.
+
+	  When copying images to the board image directory, put the layer
+	  name in the filename for rootfs images. e.g. rootfs.tar.gz becomes
+	  rootfs-layer.tar.gz.
+
+	  This is the default and should only be turned off for one of the
+	  layers, otherwise the filenames will conflict. Turning off rename
+	  allows one layer (usually one that includes the others) to have
+	  a well-known name (rootfs.tar.gz)/
